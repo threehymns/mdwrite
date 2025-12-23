@@ -26,6 +26,32 @@ export const Route = createRootRoute({
 				href: appCss,
 			},
 		],
+		scripts: [
+			{
+				children: `
+					(function() {
+						try {
+							var theme = localStorage.getItem('theme') || 'system';
+							var colorTheme = localStorage.getItem('color-theme') || 'default';
+							var root = document.documentElement;
+							
+							if (theme === 'system') {
+								var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+								root.classList.add(systemTheme);
+							} else {
+								root.classList.add(theme);
+							}
+
+							var link = document.createElement('link');
+							link.id = 'color-theme-link';
+							link.rel = 'stylesheet';
+							link.href = '/themes/' + colorTheme + '.css';
+							document.head.appendChild(link);
+						} catch (e) {}
+					})();
+				`,
+			},
+		],
 	}),
 
 	shellComponent: RootDocument,

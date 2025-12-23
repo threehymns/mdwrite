@@ -1,0 +1,45 @@
+:root {
+	--theme-name: "Catppuccin Frappé";
+	--background: oklch(0.957 0.01 237);
+	--foreground: oklch(0.359 0.031 254);
+	--card: oklch(0.957 0.01 237);
+	--card-foreground: oklch(0.359 0.031 254);
+	--popover: oklch(0.957 0.01 237);
+	--popover-foreground: oklch(0.359 0.031 254);
+	--primary: oklch(0.606 0.165 272.7);
+	--primary-foreground: oklch(0.957 0.01 237);
+	--secondary: oklch(0.91 0.02 240);
+	--secondary-foreground: oklch(0.606 0.165 272.7);
+	--muted: oklch(0.91 0.02 240);
+	--muted-foreground: oklch(0.5 0.03 240);
+	--accent: oklch(0.91 0.02 240);
+	--accent-foreground: oklch(0.606 0.165 272.7);
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: oklch(0.85 0.02 240);
+	--input: oklch(0.85 0.02 240);
+	--ring: oklch(0.606 0.165 272.7);
+	--radius: 0.625rem;
+	--sidebar: oklch(0.92 0.02 240);
+}
+
+.dark {
+	--background: oklch(0.264 0.038 261.3);
+	--foreground: oklch(0.84 0.034 263);
+	--card: oklch(0.3 0.04 261.3);
+	--card-foreground: oklch(0.84 0.034 263);
+	--popover: oklch(0.3 0.04 261.3);
+	--popover-foreground: oklch(0.84 0.034 263);
+	--primary: oklch(0.79 0.07 270);
+	--primary-foreground: oklch(0.264 0.038 261.3);
+	--secondary: oklch(0.35 0.04 261.3);
+	--secondary-foreground: oklch(0.84 0.034 263);
+	--muted: oklch(0.35 0.04 261.3);
+	--muted-foreground: oklch(0.7 0.03 261.3);
+	--accent: oklch(0.35 0.04 261.3);
+	--accent-foreground: oklch(0.84 0.034 263);
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: oklch(0.4 0.04 261.3);
+	--input: oklch(0.4 0.04 261.3);
+	--ring: oklch(0.79 0.07 270);
+	--sidebar: oklch(0.23 0.038 261.3);
+}

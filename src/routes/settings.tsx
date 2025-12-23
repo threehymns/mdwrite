@@ -9,7 +9,12 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import * as React from "react";
-import { type Theme, useTheme } from "@/components/theme-provider";
+import {
+	COLOR_THEMES,
+	type ColorTheme,
+	type Theme,
+	useTheme,
+} from "@/components/theme-provider";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -31,6 +36,14 @@ import { Separator } from "@/components/ui/separator";
 import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/settings")({ component: SettingsPage });
+
+interface ThemeMetadata {
+	id: ColorTheme;
+	name: string;
+	primary: string;
+	light: { bg: string; sidebar: string };
+	dark: { bg: string; sidebar: string };
+}
 
 function ShortcutRecorder({
 	initialKeys,
@@ -95,9 +108,75 @@ function ShortcutRecorder({
 	);
 }
 
+function parseTheme(id: ColorTheme, css: string): ThemeMetadata {
+	const extractVar = (section: string, name: string) => {
+		const regex = new RegExp(`${name}:\\s*([^;\\n]+)`);
+		const match = section.match(regex);
+		return match ? match[1].trim() : "";
+	};
+
+	const rootMatch = css.match(/:root\s*{([^}]+)}/);
+	const darkMatch = css.match(/\.dark\s*{([^}]+)}/);
+
+	const root = rootMatch ? rootMatch[1] : "";
+	const dark = darkMatch ? darkMatch[1] : "";
+
+	const nameMatch = root.match(/--theme-name:\s*"([^"]+)"/);
+	const name = nameMatch ? nameMatch[1] : id;
+
+	return {
+		id,
+		name,
+		primary: extractVar(root, "--primary"),
+		light: {
+			bg: extractVar(root, "--background"),
+			sidebar:
+				extractVar(root, "--sidebar") || extractVar(root, "--background"),
+		},
+		dark: {
+			bg: extractVar(dark, "--background") || extractVar(root, "--background"),
+			sidebar:
+				extractVar(dark, "--sidebar") ||
+				extractVar(dark, "--background") ||
+				extractVar(root, "--sidebar") ||
+				extractVar(root, "--background"),
+		},
+	};
+}
+
 function SettingsPage() {
-	const { theme, setTheme, fontSize, setFontSize } = useTheme();
+	const { theme, setTheme, colorTheme, setColorTheme, fontSize, setFontSize } =
+		useTheme();
 	const { shortcuts, updateShortcut, resetShortcuts } = useKeyboardShortcuts();
+
+	const [themes, setThemes] = React.useState<ThemeMetadata[]>([]);
+
+	React.useEffect(() => {
+		const loadThemes = async () => {
+			const loaded = await Promise.all(
+				COLOR_THEMES.map(async (id) => {
+					try {
+						const res = await fetch(`/themes/${id}.css`);
+						const text = await res.text();
+						return parseTheme(id, text);
+					} catch (e) {
+						console.error(`Failed to load theme ${id}`, e);
+						return null;
+					}
+				}),
+			);
+			setThemes(loaded.filter((t): t is ThemeMetadata => t !== null));
+		};
+		loadThemes();
+	}, []);
+
+	const resolvedTheme = React.useMemo(() => {
+		if (theme !== "system") return theme;
+		if (typeof window === "undefined") return "light";
+		return window.matchMedia("(prefers-color-scheme: dark)").matches
+			? "dark"
+			: "light";
+	}, [theme]);
 
 	return (
 		<div className="min-h-screen bg-background p-8 text-foreground">
@@ -119,47 +198,108 @@ function SettingsPage() {
 								Customize how MDWrite looks on your screen.
 							</CardDescription>
 						</CardHeader>
-						<CardContent className="space-y-6">
-							<div className="flex items-center justify-between">
+						<CardContent className="space-y-8">
+							<div className="space-y-4">
 								<div className="space-y-0.5">
-									<Label>Theme</Label>
+									<Label>Mode</Label>
 									<p className="text-muted-foreground text-sm">
-										Select your preferred color theme.
+										Select your preferred light or dark mode.
 									</p>
 								</div>
-								<Select
-									value={theme}
-									onValueChange={(v) => v && setTheme(v as Theme)}
-								>
-									<SelectTrigger className="w-40">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectGroup>
-											<SelectItem value="light">
-												<div className="flex items-center gap-2">
-													<HugeiconsIcon icon={SunIcon} className="h-4 w-4" />
-													<span>Light</span>
+								<div className="grid grid-cols-3 gap-4">
+									{[
+										{ id: "light", icon: SunIcon, label: "Light" },
+										{ id: "dark", icon: MoonIcon, label: "Dark" },
+										{ id: "system", icon: ComputerIcon, label: "System" },
+									].map((item) => (
+										<button
+											key={item.id}
+											type="button"
+											onClick={() => setTheme(item.id as Theme)}
+											className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-accent ${
+												theme === item.id
+													? "border-primary bg-accent"
+													: "border-muted bg-transparent"
+											}`}
+										>
+											<HugeiconsIcon icon={item.icon} className="h-5 w-5" />
+											<span className="font-medium text-xs">{item.label}</span>
+										</button>
+									))}
+								</div>
+							</div>
+
+							<Separator />
+
+							<div className="space-y-4">
+								<div className="space-y-0.5">
+									<Label>Color Theme</Label>
+									<p className="text-muted-foreground text-sm">
+										Choose a primary color for your interface.
+									</p>
+								</div>
+								<div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+									{themes.map((ct) => {
+										const currentColors =
+											resolvedTheme === "dark" ? ct.dark : ct.light;
+										return (
+											<button
+												key={ct.id}
+												type="button"
+												onClick={() => setColorTheme(ct.id)}
+												className={`group relative flex overflow-hidden rounded-xl border-2 transition-all hover:ring-2 hover:ring-primary/20 ${
+													colorTheme === ct.id
+														? "border-primary ring-2 ring-primary/20"
+														: "border-muted"
+												}`}
+											>
+												{/* Sidebar area */}
+												<div
+													className="w-12 shrink-0 border-r"
+													style={{ backgroundColor: currentColors.sidebar }}
+												/>
+
+												{/* Main content area */}
+												<div
+													className="flex flex-1 flex-col p-3 text-left"
+													style={{ backgroundColor: currentColors.bg }}
+												>
+													<div className="mb-3 flex items-center justify-between">
+														<span
+															className="font-semibold text-sm"
+															style={{
+																color:
+																	resolvedTheme === "light" ? "black" : "white",
+															}}
+														>
+															{ct.name}
+														</span>
+														<div
+															className="h-2 w-2 rounded-full"
+															style={{ backgroundColor: ct.primary }}
+														/>
+													</div>
+
+													{/* Lines */}
+													<div className="space-y-1.5">
+														<div
+															className="h-1 w-full rounded-full opacity-20"
+															style={{ backgroundColor: ct.primary }}
+														/>
+														<div
+															className="h-1 w-2/3 rounded-full opacity-20"
+															style={{ backgroundColor: ct.primary }}
+														/>
+														<div
+															className="mt-2 h-1 w-1/2 rounded-full"
+															style={{ backgroundColor: ct.primary }}
+														/>
+													</div>
 												</div>
-											</SelectItem>
-											<SelectItem value="dark">
-												<div className="flex items-center gap-2">
-													<HugeiconsIcon icon={MoonIcon} className="h-4 w-4" />
-													<span>Dark</span>
-												</div>
-											</SelectItem>
-											<SelectItem value="system">
-												<div className="flex items-center gap-2">
-													<HugeiconsIcon
-														icon={ComputerIcon}
-														className="h-4 w-4"
-													/>
-													<span>System</span>
-												</div>
-											</SelectItem>
-										</SelectGroup>
-									</SelectContent>
-								</Select>
+											</button>
+										);
+									})}
+								</div>
 							</div>
 
 							<Separator />

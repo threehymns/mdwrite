@@ -1,0 +1,45 @@
+:root {
+	--theme-name: "Catppuccin Mocha";
+	--background: oklch(0.957 0.01 237);
+	--foreground: oklch(0.359 0.031 254);
+	--card: oklch(0.957 0.01 237);
+	--card-foreground: oklch(0.359 0.031 254);
+	--popover: oklch(0.957 0.01 237);
+	--popover-foreground: oklch(0.359 0.031 254);
+	--primary: oklch(0.53 0.2 280);
+	--primary-foreground: oklch(0.957 0.01 237);
+	--secondary: oklch(0.91 0.02 240);
+	--secondary-foreground: oklch(0.53 0.2 280);
+	--muted: oklch(0.91 0.02 240);
+	--muted-foreground: oklch(0.5 0.03 240);
+	--accent: oklch(0.91 0.02 240);
+	--accent-foreground: oklch(0.53 0.2 280);
+	--destructive: oklch(0.577 0.245 27.325);
+	--border: oklch(0.85 0.02 240);
+	--input: oklch(0.85 0.02 240);
+	--ring: oklch(0.53 0.2 280);
+	--radius: 0.625rem;
+	--sidebar: oklch(0.92 0.02 240);
+}
+
+.dark {
+	--background: oklch(0.178 0.029 271.7);
+	--foreground: oklch(0.864 0.025 258);
+	--card: oklch(0.22 0.03 271.7);
+	--card-foreground: oklch(0.864 0.025 258);
+	--popover: oklch(0.22 0.03 271.7);
+	--popover-foreground: oklch(0.864 0.025 258);
+	--primary: oklch(0.78 0.12 280);
+	--primary-foreground: oklch(0.178 0.029 271.7);
+	--secondary: oklch(0.25 0.03 271.7);
+	--secondary-foreground: oklch(0.864 0.025 258);
+	--muted: oklch(0.25 0.03 271.7);
+	--muted-foreground: oklch(0.7 0.03 271.7);
+	--accent: oklch(0.25 0.03 271.7);
+	--accent-foreground: oklch(0.864 0.025 258);
+	--destructive: oklch(0.704 0.191 22.216);
+	--border: oklch(0.3 0.03 271.7);
+	--input: oklch(0.3 0.03 271.7);
+	--ring: oklch(0.78 0.12 280);
+	--sidebar: oklch(0.15 0.029 271.7);
+}

@@ -1,10 +1,30 @@
 import * as React from "react";
 
 export type Theme = "light" | "dark" | "system";
+export type ColorTheme =
+	| "default"
+	| "one-dark"
+	| "dracula"
+	| "nord"
+	| "github"
+	| "catppuccin-frappe"
+	| "catppuccin-mocha";
+
+export const COLOR_THEMES: ColorTheme[] = [
+	"default",
+	"github",
+	"one-dark",
+	"dracula",
+	"nord",
+	"catppuccin-frappe",
+	"catppuccin-mocha",
+];
 
 interface ThemeContextType {
 	theme: Theme;
 	setTheme: (theme: Theme) => void;
+	colorTheme: ColorTheme;
+	setColorTheme: (theme: ColorTheme) => void;
 	fontSize: string;
 	setFontSize: (size: string) => void;
 }
@@ -19,6 +39,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 			return (localStorage.getItem("theme") as Theme) || "system";
 		}
 		return "system";
+	});
+
+	const [colorTheme, setColorTheme] = React.useState<ColorTheme>(() => {
+		if (typeof window !== "undefined") {
+			return (localStorage.getItem("color-theme") as ColorTheme) || "default";
+		}
+		return "default";
 	});
 
 	const [fontSize, setFontSize] = React.useState(() => {
@@ -45,6 +72,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 	}, [theme]);
 
 	React.useEffect(() => {
+		localStorage.setItem("color-theme", colorTheme);
+		let link = document.getElementById("color-theme-link") as HTMLLinkElement;
+		if (!link) {
+			link = document.createElement("link");
+			link.id = "color-theme-link";
+			link.rel = "stylesheet";
+			document.head.appendChild(link);
+		}
+		link.href = `/themes/${colorTheme}.css`;
+	}, [colorTheme]);
+
+	React.useEffect(() => {
 		localStorage.setItem("fontSize", fontSize);
 		document.documentElement.style.setProperty(
 			"--editor-font-size",
@@ -53,7 +92,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 	}, [fontSize]);
 
 	return (
-		<ThemeContext.Provider value={{ theme, setTheme, fontSize, setFontSize }}>
+		<ThemeContext.Provider
+			value={{
+				theme,
+				setTheme,
+				colorTheme,
+				setColorTheme,
+				fontSize,
+				setFontSize,
+			}}
+		>
 			{children}
 		</ThemeContext.Provider>
 	);
