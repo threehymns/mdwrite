@@ -11,6 +11,8 @@ export interface FileNode {
 	parentHandle?: FileSystemDirectoryHandle;
 }
 
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
+
 export async function getFileTree(
 	dirHandle: FileSystemDirectoryHandle,
 	relativePath = "",
@@ -34,7 +36,10 @@ export async function getFileTree(
 				children,
 				parentHandle: dirHandle,
 			});
-		} else if (entry.name.endsWith(".md")) {
+		} else if (
+			entry.name.endsWith(".md") ||
+			IMAGE_EXTENSIONS.some((ext) => entry.name.toLowerCase().endsWith(ext))
+		) {
 			nodes.push({
 				name: entry.name,
 				kind: "file",
@@ -148,4 +153,22 @@ export async function requestPermission(
 ): Promise<boolean> {
 	// @ts-expect-error
 	return (await handle.requestPermission({ mode: "readwrite" })) === "granted";
+}
+
+export async function getFileHandleByPath(
+	dirHandle: FileSystemDirectoryHandle,
+	path: string,
+): Promise<FileSystemFileHandle | null> {
+	const parts = path.split("/").filter((p) => p !== "." && p !== "");
+	let currentDir = dirHandle;
+
+	try {
+		for (let i = 0; i < parts.length - 1; i++) {
+			currentDir = await currentDir.getDirectoryHandle(parts[i]);
+		}
+		return await currentDir.getFileHandle(parts[parts.length - 1]);
+	} catch (err) {
+		console.error(`Failed to get file handle for path: ${path}`, err);
+		return null;
+	}
 }

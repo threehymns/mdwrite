@@ -18,7 +18,7 @@ import {
 	Tick02Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { mergeAttributes, Node } from "@tiptap/core";
+import { mergeAttributes, Node, textblockTypeInputRule } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import type { NodeViewProps } from "@tiptap/react";
 import {
@@ -557,6 +557,46 @@ export const CodeBlockCodeMirror = Node.create({
 			"pre",
 			mergeAttributes(HTMLAttributes),
 			["code", mergeAttributes(HTMLAttributes), 0],
+		];
+	},
+
+	addCommands() {
+		return {
+			setCodeBlock:
+				(attributes) =>
+				({ commands }) => {
+					return commands.setNode(this.name, attributes);
+				},
+			toggleCodeBlock:
+				(attributes) =>
+				({ commands }) => {
+					return commands.toggleNode(this.name, "paragraph", attributes);
+				},
+		};
+	},
+
+	addKeyboardShortcuts() {
+		return {
+			"Mod-Alt-c": () => this.editor.commands.toggleCodeBlock(),
+		};
+	},
+
+	addInputRules() {
+		return [
+			textblockTypeInputRule({
+				find: /^```(\S+)?[\s\n]$/,
+				type: this.type,
+				getAttributes: (match) => ({
+					language: match[1],
+				}),
+			}),
+			textblockTypeInputRule({
+				find: /^~~~(\S+)?[\s\n]$/,
+				type: this.type,
+				getAttributes: (match) => ({
+					language: match[1],
+				}),
+			}),
 		];
 	},
 

@@ -4,6 +4,7 @@ import {
 	Delete01Icon,
 	File01Icon,
 	Folder01Icon,
+	Image01Icon,
 	MoreVerticalIcon,
 	PencilEdit01Icon,
 	Search01Icon,
@@ -239,6 +240,10 @@ function FileTreeNode({
 		setIsRenaming(false);
 	};
 
+	const isImage = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"].some(
+		(ext) => node.name.toLowerCase().endsWith(ext),
+	);
+
 	const nodeContent = (
 		<div
 			className={cn(
@@ -265,7 +270,13 @@ function FileTreeNode({
 				className="flex flex-1 items-center gap-2 overflow-hidden text-left"
 			>
 				<HugeiconsIcon
-					icon={node.kind === "directory" ? Folder01Icon : File01Icon}
+					icon={
+						node.kind === "directory"
+							? Folder01Icon
+							: isImage
+								? Image01Icon
+								: File01Icon
+					}
 					className={cn(
 						"h-4 w-4 shrink-0",
 						isSelected

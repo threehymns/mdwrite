@@ -10,6 +10,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { CommandBar } from "@/components/command-bar";
 import { Editor, type EditorHandle } from "@/components/editor";
+import { ImageTab } from "@/components/image-tab";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { TabBar } from "@/components/tab-bar";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import type { Action } from "@/lib/actions";
 import {
 	type FileNode,
+	getFileHandleByPath,
 	getFileTree,
 	getRecentFolder,
 	getStoredHandle,
@@ -171,15 +173,22 @@ function App() {
 	const handleFileSelect = React.useCallback(
 		async (file: FileNode) => {
 			if (file.kind === "file") {
+				const isImage = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"].some(
+					(ext) => file.name.toLowerCase().endsWith(ext),
+				);
+
 				if (!tabs.find((t) => t.relativePath === file.relativePath)) {
 					setTabs((prev) => [...prev, file]);
 				}
 				setActivePath(file.relativePath);
-				const { content: text, lastModified } = await readFile(
-					file.handle as FileSystemFileHandle,
-				);
-				lastModifiedRef.current = lastModified;
-				setContent(text);
+
+				if (!isImage) {
+					const { content: text, lastModified } = await readFile(
+						file.handle as FileSystemFileHandle,
+					);
+					lastModifiedRef.current = lastModified;
+					setContent(text);
+				}
 			}
 		},
 		[tabs],
@@ -317,6 +326,32 @@ function App() {
 			return null;
 		}
 	};
+
+	const handleResolveImagePath = React.useCallback(
+		async (path: string) => {
+			if (
+				path.startsWith("http") ||
+				path.startsWith("data:") ||
+				path.startsWith("blob:")
+			) {
+				return path;
+			}
+
+			if (!currentFile || !currentFile.parentHandle) return null;
+
+			const fileHandle = await getFileHandleByPath(
+				currentFile.parentHandle,
+				path,
+			);
+			if (fileHandle) {
+				const file = await fileHandle.getFile();
+				return URL.createObjectURL(file);
+			}
+
+			return null;
+		},
+		[currentFile],
+	);
 
 	const actions: Action[] = React.useMemo(
 		() => [
@@ -550,6 +585,15 @@ function App() {
 		);
 	}
 
+	const currentIsImage = [
+		".png",
+		".jpg",
+		".jpeg",
+		".gif",
+		".svg",
+		".webp",
+	].some((ext) => currentFile?.name.toLowerCase().endsWith(ext));
+
 	return (
 		<div className="flex h-screen overflow-hidden text-foreground">
 			{isSidebarOpen && (
@@ -609,19 +653,26 @@ function App() {
 						rootHandle={rootHandle}
 						onFileSelect={handleFileSelect}
 					/>
-					<TableOfContents
-						headings={headings}
-						onHeadingClick={handleHeadingClick}
-						activeHeadingIndex={activeHeadingIndex}
-					/>
-					{currentFile ? (
-						<Editor
-							key={activePath}
-							content={content}
-							onChange={handleContentChange}
-							onImageUpload={handleImageUpload}
-							editorRef={editorRef}
+					{currentFile && !currentIsImage && (
+						<TableOfContents
+							headings={headings}
+							onHeadingClick={handleHeadingClick}
+							activeHeadingIndex={activeHeadingIndex}
 						/>
+					)}
+					{currentFile ? (
+						currentIsImage ? (
+							<ImageTab file={currentFile} />
+						) : (
+							<Editor
+								key={activePath}
+								content={content}
+								onChange={handleContentChange}
+								onImageUpload={handleImageUpload}
+								resolveImagePath={handleResolveImagePath}
+								editorRef={editorRef}
+							/>
+						)
 					) : (
 						<div className="flex h-full items-center justify-center text-muted-foreground">
 							Select a file from the sidebar to start editing
