@@ -6,6 +6,7 @@ import {
 	Folder01Icon,
 	MoreVerticalIcon,
 	PencilEdit01Icon,
+	Search01Icon,
 	Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -26,28 +27,41 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { FileNode } from "@/lib/fs";
 import { cn } from "@/lib/utils";
+import { Button } from "./ui/button";
 
 interface SidebarProps {
 	files: FileNode[];
 	onFileSelect: (file: FileNode) => void;
-	onNewFile?: () => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	currentFile?: FileNode;
 	headings?: { level: number; text: string; index: number }[];
 	onHeadingClick?: (index: number) => void;
+	onSearchOpen: () => void;
 }
 
 export function Sidebar({
 	files,
 	onFileSelect,
-	onNewFile,
 	onDelete,
 	onRename,
 	currentFile,
+	onSearchOpen,
 }: SidebarProps) {
 	return (
 		<div className="flex h-full w-64 flex-col border-r bg-secondary/30">
+			<div className="px-2 pt-2">
+				<Button
+					type="button"
+					onClick={onSearchOpen}
+					variant="outline"
+					size="lg"
+					className="w-full justify-start"
+				>
+					<HugeiconsIcon icon={Search01Icon} className="h-4 w-4" />
+					<span>Search</span>
+				</Button>
+			</div>
 			<div className="flex-1 overflow-auto p-2">
 				<FileTree
 					nodes={files}

@@ -556,10 +556,10 @@ function App() {
 				<Sidebar
 					files={files}
 					onFileSelect={handleFileSelect}
-					onNewFile={handleNewFile}
 					onDelete={handleDeleteFile}
 					onRename={handleRenameFile}
 					currentFile={currentFile}
+					onSearchOpen={() => setIsSearchOpen(true)}
 				/>
 			)}
 			<main className="flex min-w-0 flex-1 flex-col bg-background">
@@ -582,15 +582,6 @@ function App() {
 					}
 					right={
 						<div className="flex items-center gap-2">
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={() => setIsSearchOpen(true)}
-								type="button"
-								className="h-8 w-8"
-							>
-								<HugeiconsIcon icon={Search01Icon} className="h-4 w-4" />
-							</Button>
 							<span className="hidden text-muted-foreground text-xs lg:inline">
 								{rootHandle.name}
 							</span>
