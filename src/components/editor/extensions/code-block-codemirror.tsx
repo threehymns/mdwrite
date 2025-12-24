@@ -12,6 +12,7 @@ import { LanguageDescription, LanguageSupport } from "@codemirror/language";
 import { Compartment, EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import {
+	ArrowDown01Icon,
 	Copy01Icon,
 	TextWrapIcon,
 	Tick02Icon,
@@ -26,15 +27,8 @@ import {
 	ReactNodeViewRenderer,
 } from "@tiptap/react";
 import { vscodeDark, vscodeLight } from "@uiw/codemirror-theme-vscode";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 // Define supported languages
@@ -137,6 +131,8 @@ const CodeMirrorComponent = ({
 	const isUpdatingRef = useRef(false);
 	const languageLoadIdRef = useRef(0);
 	const destroyedRef = useRef(false);
+
+	const uniqueId = useRef(Math.random().toString(36).substring(2, 9)).current;
 
 	// Define compartments within the component to ensure unique instances for each code block
 	const { languageConf, lineWrappingConf, themeConf } = useRef({
@@ -440,36 +436,37 @@ const CodeMirrorComponent = ({
 
 	return (
 		<NodeViewWrapper className="code-block" contentEditable={false}>
-			<div
-				className="not-prose my-6 overflow-hidden rounded-lg border border-border bg-card"
-				contentEditable={false}
-			>
-				<div
-					className="flex items-center justify-between border-border border-b bg-muted/50 px-4 py-1"
-					contentEditable={false}
-				>
-					<Select value={currentLanguage} onValueChange={handleLanguageChange}>
-						<SelectTrigger className="h-7 border-none bg-transparent! px-0 py-0 text-muted-foreground text-xs hover:bg-transparent hover:text-foreground focus-visible:ring-0">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent side="bottom" align="start">
-							{currentLanguage &&
-								!languages.some(
-									(l) =>
-										l.name === currentLanguage ||
-										l.alias?.includes(currentLanguage),
-								) && (
-									<SelectItem value={currentLanguage}>
-										{currentLanguage} (unknown)
-									</SelectItem>
-								)}
-							{languages.map((lang) => (
-								<SelectItem key={lang.name} value={lang.name}>
-									{lang.name}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+			<div className="not-prose my-6 overflow-hidden rounded-lg border border-border bg-card">
+				<div className="code-block-ui flex items-center justify-between border-border border-b bg-muted/50 px-4 py-1">
+					<select
+						key={`code-block-select-${uniqueId}`}
+						value={currentLanguage}
+						onChange={(e) => handleLanguageChange(e.target.value)}
+						className="language-select"
+					>
+						<button
+							type="button"
+							className="flex items-center gap-1 focus:outline-none"
+						>
+							{React.createElement("selectedcontent")}
+							<HugeiconsIcon icon={ArrowDown01Icon} size={12} />
+						</button>
+						{currentLanguage &&
+							!languages.some(
+								(l) =>
+									l.name === currentLanguage ||
+									l.alias?.includes(currentLanguage),
+							) && (
+								<option value={currentLanguage}>
+									{currentLanguage} (unknown)
+								</option>
+							)}
+						{languages.map((lang) => (
+							<option key={lang.name} value={lang.name}>
+								{lang.name}
+							</option>
+						))}
+					</select>
 
 					<div className="flex items-center gap-1 border-border border-l pl-2">
 						<button
@@ -565,7 +562,19 @@ export const CodeBlockCodeMirror = Node.create({
 
 	addNodeView() {
 		return ReactNodeViewRenderer(CodeMirrorComponent, {
-			stopEvent: () => true,
+			stopEvent: ({ event }) => {
+				const target = event.target as HTMLElement;
+				// Stop events from the CodeMirror editor itself
+				if (target?.closest?.(".cm-editor")) {
+					return true;
+				}
+				// Allow events from our UI controls to bubble up so ProseMirror knows they're interactive,
+				// but stop events from the wrapper itself if it's not a UI control.
+				if (target?.closest?.(".code-block-ui")) {
+					return false;
+				}
+				return true;
+			},
 			ignoreMutation: () => true,
 		});
 	},
