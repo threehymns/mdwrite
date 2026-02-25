@@ -7,6 +7,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.dark {
+  color-scheme: dark;
+}
+
 @theme inline {
 	--font-sans: "Figtree Variable", sans-serif;
 	--color-sidebar-ring: var(--sidebar-ring);
