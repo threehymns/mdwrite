@@ -8,7 +8,8 @@ export type ColorTheme =
 	| "nord"
 	| "github"
 	| "catppuccin-frappe"
-	| "catppuccin-mocha";
+	| "catppuccin-mocha"
+	| "gruvbox";
 
 export const COLOR_THEMES: ColorTheme[] = [
 	"default",
@@ -18,6 +19,7 @@ export const COLOR_THEMES: ColorTheme[] = [
 	"nord",
 	"catppuccin-frappe",
 	"catppuccin-mocha",
+	"gruvbox",
 ];
 
 interface ThemeContextType {
