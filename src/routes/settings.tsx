@@ -145,8 +145,16 @@ function parseTheme(id: ColorTheme, css: string): ThemeMetadata {
 }
 
 function SettingsPage() {
-	const { theme, setTheme, colorTheme, setColorTheme, fontSize, setFontSize } =
-		useTheme();
+	const {
+		theme,
+		setTheme,
+		colorTheme,
+		setColorTheme,
+		fontSize,
+		setFontSize,
+		showHiddenFiles,
+		setShowHiddenFiles,
+	} = useTheme();
 	const { shortcuts, updateShortcut, resetShortcuts } = useKeyboardShortcuts();
 
 	const [themes, setThemes] = React.useState<ThemeMetadata[]>([]);
@@ -328,6 +336,30 @@ function SettingsPage() {
 										</SelectGroup>
 									</SelectContent>
 								</Select>
+							</div>
+
+							<Separator />
+
+							<div className="flex items-center justify-between">
+								<div className="space-y-0.5">
+									<Label>Show Hidden Files</Label>
+									<p className="text-muted-foreground text-sm">
+										Show files and folders starting with a dot.
+									</p>
+								</div>
+								<button
+									type="button"
+									onClick={() => setShowHiddenFiles(!showHiddenFiles)}
+									className={`relative h-6 w-11 rounded-full transition-colors ${
+										showHiddenFiles ? "bg-primary" : "bg-muted"
+									}`}
+								>
+									<span
+										className={`absolute top-1 left-1 h-4 w-4 rounded-full bg-background transition-transform ${
+											showHiddenFiles ? "translate-x-5" : ""
+										}`}
+									/>
+								</button>
 							</div>
 						</CardContent>
 					</Card>

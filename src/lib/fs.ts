@@ -16,10 +16,14 @@ const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
 export async function getFileTree(
 	dirHandle: FileSystemDirectoryHandle,
 	relativePath = "",
+	showHiddenFiles = false,
 ): Promise<FileNode[]> {
 	const nodes: FileNode[] = [];
 	// @ts-expect-error - FileSystemDirectoryHandle has values() but it might not be in the default types yet
 	for await (const entry of dirHandle.values()) {
+		if (!showHiddenFiles && entry.name.startsWith(".")) {
+			continue;
+		}
 		const entryRelativePath = relativePath
 			? `${relativePath}/${entry.name}`
 			: entry.name;
@@ -27,6 +31,7 @@ export async function getFileTree(
 			const children = await getFileTree(
 				entry as FileSystemDirectoryHandle,
 				entryRelativePath,
+				showHiddenFiles,
 			);
 			nodes.push({
 				name: entry.name,

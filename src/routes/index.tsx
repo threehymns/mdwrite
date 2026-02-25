@@ -14,6 +14,7 @@ import { ImageTab } from "@/components/image-tab";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
 import { TabBar } from "@/components/tab-bar";
+import { useTheme } from "@/components/theme-provider";
 import { TableOfContents } from "@/components/toc";
 import { Button } from "@/components/ui/button";
 import type { Action } from "@/lib/actions";
@@ -57,6 +58,7 @@ function App() {
 	});
 	const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 	const [isCommandBarOpen, setIsCommandBarOpen] = React.useState(false);
+	const { showHiddenFiles } = useTheme();
 	const { shortcuts } = useKeyboardShortcuts();
 	const [rootHandle, setRootHandle] =
 		React.useState<FileSystemDirectoryHandle | null>(null);
@@ -137,10 +139,10 @@ function App() {
 
 	const refreshFiles = React.useCallback(
 		async (handle: FileSystemDirectoryHandle) => {
-			const tree = await getFileTree(handle);
+			const tree = await getFileTree(handle, "", showHiddenFiles);
 			setFiles(tree);
 		},
-		[],
+		[showHiddenFiles],
 	);
 
 	const handleOpenFolder = React.useCallback(async () => {
@@ -507,11 +509,18 @@ function App() {
 	}, [activePath]);
 
 	React.useEffect(() => {
+		if (!rootHandle) return;
+		void refreshFiles(rootHandle);
+	}, [rootHandle, refreshFiles]);
+
+	React.useEffect(() => {
 		const init = async () => {
+			const showHiddenFilesOnInit =
+				localStorage.getItem("showHiddenFiles") === "true";
 			const recent = await getRecentFolder();
 			if (recent) {
 				setRootHandle(recent);
-				const tree = await getFileTree(recent);
+				const tree = await getFileTree(recent, "", showHiddenFilesOnInit);
 				setFiles(tree);
 
 				const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);

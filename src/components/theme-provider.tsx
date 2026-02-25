@@ -27,6 +27,8 @@ interface ThemeContextType {
 	setColorTheme: (theme: ColorTheme) => void;
 	fontSize: string;
 	setFontSize: (size: string) => void;
+	showHiddenFiles: boolean;
+	setShowHiddenFiles: (show: boolean) => void;
 }
 
 const ThemeContext = React.createContext<ThemeContextType | undefined>(
@@ -53,6 +55,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 			return localStorage.getItem("fontSize") || "16";
 		}
 		return "16";
+	});
+
+	const [showHiddenFiles, setShowHiddenFiles] = React.useState(() => {
+		if (typeof window !== "undefined") {
+			return localStorage.getItem("showHiddenFiles") === "true";
+		}
+		return false;
 	});
 
 	React.useEffect(() => {
@@ -91,6 +100,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 		);
 	}, [fontSize]);
 
+	React.useEffect(() => {
+		localStorage.setItem("showHiddenFiles", String(showHiddenFiles));
+	}, [showHiddenFiles]);
+
 	return (
 		<ThemeContext.Provider
 			value={{
@@ -100,6 +113,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 				setColorTheme,
 				fontSize,
 				setFontSize,
+				showHiddenFiles,
+				setShowHiddenFiles,
 			}}
 		>
 			{children}
