@@ -35,6 +35,8 @@ interface SidebarProps {
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	currentFile?: FileNode;
 	headings?: { level: number; text: string; index: number }[];
 	onHeadingClick?: (index: number) => void;
@@ -46,6 +48,8 @@ export function Sidebar({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onCreateFolder,
+	onCreateNote,
 	currentFile,
 	onSearchOpen,
 }: SidebarProps) {
@@ -69,6 +73,8 @@ export function Sidebar({
 					onFileSelect={onFileSelect}
 					onDelete={onDelete}
 					onRename={onRename}
+					onCreateFolder={onCreateFolder}
+					onCreateNote={onCreateNote}
 					currentFile={currentFile}
 				/>
 			</div>
@@ -93,6 +99,8 @@ function FileTree({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onCreateFolder,
+	onCreateNote,
 	currentFile,
 	level = 0,
 }: {
@@ -100,6 +108,8 @@ function FileTree({
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	currentFile?: FileNode;
 	level?: number;
 }) {
@@ -112,6 +122,8 @@ function FileTree({
 					onFileSelect={onFileSelect}
 					onDelete={onDelete}
 					onRename={onRename}
+					onCreateFolder={onCreateFolder}
+					onCreateNote={onCreateNote}
 					currentFile={currentFile}
 					level={level}
 				/>
@@ -181,12 +193,18 @@ function RenameInput({
 
 function Actions({
 	isSelected,
+	isDirectory,
 	onRename,
 	onDelete,
+	onCreateNote,
+	onCreateFolder,
 }: {
 	isSelected: boolean;
+	isDirectory: boolean;
 	onRename: () => void;
 	onDelete: () => void;
+	onCreateNote?: () => void;
+	onCreateFolder?: () => void;
 }) {
 	return (
 		<DropdownMenu>
@@ -201,6 +219,18 @@ function Actions({
 				<HugeiconsIcon icon={MoreVerticalIcon} className="h-3.5 w-3.5" />
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align="end">
+				{isDirectory && (
+					<>
+						<DropdownMenuItem onClick={onCreateNote}>
+							<HugeiconsIcon icon={File01Icon} className="mr-2 h-3.5 w-3.5" />
+							<span>New Note</span>
+						</DropdownMenuItem>
+						<DropdownMenuItem onClick={onCreateFolder}>
+							<HugeiconsIcon icon={Folder01Icon} className="mr-2 h-3.5 w-3.5" />
+							<span>New Folder</span>
+						</DropdownMenuItem>
+					</>
+				)}
 				<DropdownMenuItem onClick={onRename}>
 					<HugeiconsIcon icon={PencilEdit01Icon} className="mr-2 h-3.5 w-3.5" />
 					<span>Rename</span>
@@ -219,6 +249,8 @@ function FileTreeNode({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onCreateFolder,
+	onCreateNote,
 	currentFile,
 	level,
 }: {
@@ -226,6 +258,8 @@ function FileTreeNode({
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	currentFile?: FileNode;
 	level: number;
 }) {
@@ -298,8 +332,15 @@ function FileTreeNode({
 			{!isRenaming && (
 				<Actions
 					isSelected={isSelected}
+					isDirectory={node.kind === "directory"}
 					onRename={() => setIsRenaming(true)}
 					onDelete={() => onDelete?.(node)}
+					onCreateNote={() =>
+						onCreateNote?.(node.handle as FileSystemDirectoryHandle)
+					}
+					onCreateFolder={() =>
+						onCreateFolder?.(node.handle as FileSystemDirectoryHandle)
+					}
 				/>
 			)}
 		</div>
@@ -310,6 +351,29 @@ function FileTreeNode({
 			<ContextMenu>
 				<ContextMenuTrigger render={nodeContent} />
 				<ContextMenuContent>
+					{node.kind === "directory" && (
+						<>
+							<ContextMenuItem
+								onClick={() =>
+									onCreateNote?.(node.handle as FileSystemDirectoryHandle)
+								}
+							>
+								<HugeiconsIcon icon={File01Icon} className="mr-2 h-3.5 w-3.5" />
+								<span>New Note</span>
+							</ContextMenuItem>
+							<ContextMenuItem
+								onClick={() =>
+									onCreateFolder?.(node.handle as FileSystemDirectoryHandle)
+								}
+							>
+								<HugeiconsIcon
+									icon={Folder01Icon}
+									className="mr-2 h-3.5 w-3.5"
+								/>
+								<span>New Folder</span>
+							</ContextMenuItem>
+						</>
+					)}
 					<ContextMenuItem onClick={() => setIsRenaming(true)}>
 						<HugeiconsIcon
 							icon={PencilEdit01Icon}
@@ -332,6 +396,8 @@ function FileTreeNode({
 					onFileSelect={onFileSelect}
 					onDelete={onDelete}
 					onRename={onRename}
+					onCreateFolder={onCreateFolder}
+					onCreateNote={onCreateNote}
 					currentFile={currentFile}
 					level={level + 1}
 				/>

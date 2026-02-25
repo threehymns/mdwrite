@@ -289,6 +289,51 @@ function App() {
 		}
 	}, [rootHandle, refreshFiles, handleFileSelect]);
 
+	const handleCreateNote = React.useCallback(
+		async (parentHandle: FileSystemDirectoryHandle) => {
+			const fileName = prompt("Enter file name (e.g. notes.md)");
+			if (!fileName) return;
+
+			const name = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
+			try {
+				const fileHandle = await parentHandle.getFileHandle(name, {
+					create: true,
+				});
+				if (rootHandle) await refreshFiles(rootHandle);
+				const parentPath = (
+					parentHandle as unknown as { relativePath?: string }
+				).relativePath;
+				const relativePath = parentPath ? `${parentPath}/${name}` : name;
+				const newNode: FileNode = {
+					name,
+					kind: "file",
+					handle: fileHandle,
+					relativePath,
+					parentHandle,
+				};
+				handleFileSelect(newNode);
+			} catch (err) {
+				console.error("Failed to create file", err);
+			}
+		},
+		[rootHandle, refreshFiles, handleFileSelect],
+	);
+
+	const handleCreateFolder = React.useCallback(
+		async (parentHandle: FileSystemDirectoryHandle) => {
+			const folderName = prompt("Enter folder name");
+			if (!folderName) return;
+
+			try {
+				await parentHandle.getDirectoryHandle(folderName, { create: true });
+				if (rootHandle) await refreshFiles(rootHandle);
+			} catch (err) {
+				console.error("Failed to create folder", err);
+			}
+		},
+		[rootHandle, refreshFiles],
+	);
+
 	const handleContentChange = (newContent: string) => {
 		setContent(newContent);
 		if (currentFile && currentFile.handle.kind === "file") {
@@ -602,6 +647,8 @@ function App() {
 					onFileSelect={handleFileSelect}
 					onDelete={handleDeleteFile}
 					onRename={handleRenameFile}
+					onCreateFolder={handleCreateFolder}
+					onCreateNote={handleCreateNote}
 					currentFile={currentFile}
 					onSearchOpen={() => setIsSearchOpen(true)}
 				/>
@@ -660,24 +707,48 @@ function App() {
 							activeHeadingIndex={activeHeadingIndex}
 						/>
 					)}
-					{currentFile ? (
-						currentIsImage ? (
-							<ImageTab file={currentFile} />
-						) : (
-							<Editor
-								key={activePath}
-								content={content}
-								onChange={handleContentChange}
-								onImageUpload={handleImageUpload}
-								resolveImagePath={handleResolveImagePath}
-								editorRef={editorRef}
-							/>
-						)
-					) : (
-						<div className="flex h-full items-center justify-center text-muted-foreground">
-							Select a file from the sidebar to start editing
-						</div>
-					)}
+					<div className="relative flex flex-1 flex-col overflow-hidden">
+						{tabs.map((tab) => {
+							const isImage = [
+								".png",
+								".jpg",
+								".jpeg",
+								".gif",
+								".svg",
+								".webp",
+							].some((ext) => tab.name.toLowerCase().endsWith(ext));
+
+							if (isImage) {
+								if (tab.relativePath !== activePath) return null;
+								return <ImageTab key={tab.relativePath} file={tab} />;
+							}
+
+							return (
+								<React.Activity
+									key={tab.relativePath}
+									mode={tab.relativePath === activePath ? "visible" : "hidden"}
+								>
+									<div className="flex flex-1 overflow-hidden">
+										<Editor
+											content={content}
+											onChange={handleContentChange}
+											onImageUpload={handleImageUpload}
+											resolveImagePath={handleResolveImagePath}
+											editorRef={
+												tab.relativePath === activePath ? editorRef : undefined
+											}
+											active={tab.relativePath === activePath}
+										/>
+									</div>
+								</React.Activity>
+							);
+						})}
+						{!currentFile && (
+							<div className="flex h-full items-center justify-center text-muted-foreground">
+								Select a file from the sidebar to start editing
+							</div>
+						)}
+					</div>
 				</div>
 			</main>
 		</div>
