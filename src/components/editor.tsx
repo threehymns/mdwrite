@@ -1,4 +1,8 @@
-import { Extension, InputRule } from "@tiptap/core";
+import {
+	Extension,
+	InputRule,
+	type Editor as TiptapEditor,
+} from "@tiptap/core";
 import CharacterCount from "@tiptap/extension-character-count";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
@@ -51,6 +55,8 @@ const TaskListInputRule = Extension.create({
 	},
 });
 
+const MARKDOWN_SYNC_DELAY_MS = 120;
+
 interface EditorProps {
 	content: string;
 	onChange: (content: string) => void;
@@ -63,22 +69,94 @@ export interface EditorHandle {
 	scrollToHeading: (text: string, level: number) => void;
 }
 
-export function Editor({
+type EditorComponentProps = EditorProps & {
+	editorRef?: React.RefObject<EditorHandle | null>;
+};
+
+function areEditorPropsEqual(
+	prev: EditorComponentProps,
+	next: EditorComponentProps,
+) {
+	if (prev.active || next.active) {
+		return (
+			prev.active === next.active &&
+			prev.content === next.content &&
+			prev.onChange === next.onChange &&
+			prev.onImageUpload === next.onImageUpload &&
+			prev.resolveImagePath === next.resolveImagePath &&
+			prev.editorRef === next.editorRef
+		);
+	}
+
+	return (
+		prev.active === next.active &&
+		prev.onChange === next.onChange &&
+		prev.onImageUpload === next.onImageUpload &&
+		prev.resolveImagePath === next.resolveImagePath &&
+		prev.editorRef === next.editorRef
+	);
+}
+
+function EditorComponent({
 	content,
 	onChange,
 	onImageUpload,
 	resolveImagePath,
 	editorRef,
 	active,
-}: EditorProps & { editorRef?: React.RefObject<EditorHandle | null> }) {
+}: EditorComponentProps) {
 	const lastContentRef = React.useRef(content);
 	const onChangeRef = React.useRef(onChange);
 	const activeRef = React.useRef(active);
+	const markdownSyncTimeoutRef = React.useRef<number | null>(null);
+	const pendingMarkdownEditorRef = React.useRef<TiptapEditor | null>(null);
+
+	const flushPendingMarkdown = React.useCallback(() => {
+		const pendingEditor = pendingMarkdownEditorRef.current;
+		if (!pendingEditor) return;
+		// @ts-expect-error - markdown is added by the extension
+		const markdown = pendingEditor.storage.markdown.getMarkdown() as string;
+		if (markdown === lastContentRef.current) return;
+		lastContentRef.current = markdown;
+		onChangeRef.current(markdown);
+	}, []);
+
+	const scheduleMarkdownSync = React.useCallback(
+		(editor: TiptapEditor) => {
+			pendingMarkdownEditorRef.current = editor;
+			if (markdownSyncTimeoutRef.current !== null) {
+				window.clearTimeout(markdownSyncTimeoutRef.current);
+			}
+			markdownSyncTimeoutRef.current = window.setTimeout(() => {
+				markdownSyncTimeoutRef.current = null;
+				flushPendingMarkdown();
+			}, MARKDOWN_SYNC_DELAY_MS);
+		},
+		[flushPendingMarkdown],
+	);
+
+	const flushMarkdownSyncNow = React.useCallback(() => {
+		if (markdownSyncTimeoutRef.current !== null) {
+			window.clearTimeout(markdownSyncTimeoutRef.current);
+			markdownSyncTimeoutRef.current = null;
+		}
+		flushPendingMarkdown();
+	}, [flushPendingMarkdown]);
 
 	React.useEffect(() => {
 		onChangeRef.current = onChange;
 		activeRef.current = active;
 	}, [onChange, active]);
+
+	React.useEffect(() => {
+		return () => {
+			if (markdownSyncTimeoutRef.current !== null) {
+				window.clearTimeout(markdownSyncTimeoutRef.current);
+				markdownSyncTimeoutRef.current = null;
+			}
+			flushPendingMarkdown();
+		};
+	}, [flushPendingMarkdown]);
 
 	const editor = useEditor({
 		extensions: [
@@ -106,12 +184,13 @@ export function Editor({
 			TaskListInputRule,
 		],
 		content,
-		onUpdate: ({ editor }) => {
+		onUpdate: ({ editor, transaction }) => {
 			if (!activeRef.current) return;
-			// @ts-expect-error - markdown is added by the extension
-			const markdown = editor.storage.markdown.getMarkdown() as string;
-			lastContentRef.current = markdown;
-			onChangeRef.current(markdown);
+			if (!transaction.docChanged) return;
+			scheduleMarkdownSync(editor);
+		},
+		onBlur: () => {
+			flushMarkdownSyncNow();
 		},
 		editorProps: {
 			attributes: {
@@ -258,3 +337,6 @@ export function Editor({
 		</div>
 	);
 }
+
+export const Editor = React.memo(EditorComponent, areEditorPropsEqual);
+Editor.displayName = "Editor";

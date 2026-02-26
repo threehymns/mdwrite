@@ -52,9 +52,11 @@ export function SearchDialog({
 		{ node: FileNode; snippet: string }[]
 	>([]);
 	const [isSearching, setIsSearching] = React.useState(false);
+	const searchRequestRef = React.useRef(0);
 
 	React.useEffect(() => {
 		if (!isOpen) {
+			++searchRequestRef.current;
 			setQuery("");
 			setResults([]);
 		}
@@ -63,18 +65,25 @@ export function SearchDialog({
 	React.useEffect(() => {
 		const performSearch = async () => {
 			if (!rootHandle || query.length < 2) {
+				++searchRequestRef.current;
 				setResults([]);
+				setIsSearching(false);
 				return;
 			}
 
+			const requestId = ++searchRequestRef.current;
 			setIsSearching(true);
 			try {
 				const searchResults = await searchFiles(rootHandle, query);
-				setResults(searchResults);
+				if (requestId === searchRequestRef.current) {
+					setResults(searchResults);
+				}
 			} catch (error) {
 				console.error("Search failed:", error);
 			} finally {
-				setIsSearching(false);
+				if (requestId === searchRequestRef.current) {
+					setIsSearching(false);
+				}
 			}
 		};
 

@@ -39,31 +39,23 @@ const ThemeContext = React.createContext<ThemeContextType | undefined>(
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
 	const [theme, setTheme] = React.useState<Theme>(() => {
-		if (typeof window !== "undefined") {
-			return (localStorage.getItem("theme") as Theme) || "system";
-		}
-		return "system";
+		if (typeof window === "undefined") return "system";
+		return (localStorage.getItem("theme") as Theme) || "system";
 	});
 
 	const [colorTheme, setColorTheme] = React.useState<ColorTheme>(() => {
-		if (typeof window !== "undefined") {
-			return (localStorage.getItem("color-theme") as ColorTheme) || "default";
-		}
-		return "default";
+		if (typeof window === "undefined") return "default";
+		return (localStorage.getItem("color-theme") as ColorTheme) || "default";
 	});
 
 	const [fontSize, setFontSize] = React.useState(() => {
-		if (typeof window !== "undefined") {
-			return localStorage.getItem("fontSize") || "16";
-		}
-		return "16";
+		if (typeof window === "undefined") return "16";
+		return localStorage.getItem("fontSize") || "16";
 	});
 
 	const [showHiddenFiles, setShowHiddenFiles] = React.useState(() => {
-		if (typeof window !== "undefined") {
-			return localStorage.getItem("showHiddenFiles") === "true";
-		}
-		return false;
+		if (typeof window === "undefined") return false;
+		return localStorage.getItem("showHiddenFiles") === "true";
 	});
 
 	React.useEffect(() => {

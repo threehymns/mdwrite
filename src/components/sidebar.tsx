@@ -37,20 +37,20 @@ interface SidebarProps {
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
-	currentFile?: FileNode;
+	activePath?: string | null;
 	headings?: { level: number; text: string; index: number }[];
 	onHeadingClick?: (index: number) => void;
 	onSearchOpen: () => void;
 }
 
-export function Sidebar({
+function SidebarComponent({
 	files,
 	onFileSelect,
 	onDelete,
 	onRename,
 	onCreateFolder,
 	onCreateNote,
-	currentFile,
+	activePath,
 	onSearchOpen,
 }: SidebarProps) {
 	return (
@@ -75,7 +75,7 @@ export function Sidebar({
 					onRename={onRename}
 					onCreateFolder={onCreateFolder}
 					onCreateNote={onCreateNote}
-					currentFile={currentFile}
+					activePath={activePath}
 				/>
 			</div>
 
@@ -94,6 +94,9 @@ export function Sidebar({
 	);
 }
 
+export const Sidebar = React.memo(SidebarComponent);
+Sidebar.displayName = "Sidebar";
+
 function FileTree({
 	nodes,
 	onFileSelect,
@@ -101,7 +104,7 @@ function FileTree({
 	onRename,
 	onCreateFolder,
 	onCreateNote,
-	currentFile,
+	activePath,
 	level = 0,
 }: {
 	nodes: FileNode[];
@@ -110,7 +113,7 @@ function FileTree({
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
-	currentFile?: FileNode;
+	activePath?: string | null;
 	level?: number;
 }) {
 	return (
@@ -124,7 +127,7 @@ function FileTree({
 					onRename={onRename}
 					onCreateFolder={onCreateFolder}
 					onCreateNote={onCreateNote}
-					currentFile={currentFile}
+					activePath={activePath}
 					level={level}
 				/>
 			))}
@@ -191,7 +194,7 @@ function RenameInput({
 	);
 }
 
-function Actions({
+const Actions = React.memo(function Actions({
 	isSelected,
 	isDirectory,
 	onRename,
@@ -206,6 +209,10 @@ function Actions({
 	onCreateNote?: () => void;
 	onCreateFolder?: () => void;
 }) {
+	const handleTriggerClick = React.useCallback((e: React.MouseEvent) => {
+		e.stopPropagation();
+	}, []);
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger
@@ -214,7 +221,7 @@ function Actions({
 					isSelected &&
 						"text-secondary-foreground hover:bg-secondary-foreground/20",
 				)}
-				onClick={(e) => e.stopPropagation()}
+				onClick={handleTriggerClick}
 			>
 				<HugeiconsIcon icon={MoreVerticalIcon} className="h-3.5 w-3.5" />
 			</DropdownMenuTrigger>
@@ -242,30 +249,61 @@ function Actions({
 			</DropdownMenuContent>
 		</DropdownMenu>
 	);
-}
+});
 
-function FileTreeNode({
-	node,
-	onFileSelect,
-	onDelete,
-	onRename,
-	onCreateFolder,
-	onCreateNote,
-	currentFile,
-	level,
-}: {
+Actions.displayName = "Actions";
+
+type FileTreeNodeProps = {
 	node: FileNode;
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
-	currentFile?: FileNode;
+	activePath?: string | null;
 	level: number;
-}) {
+};
+
+function FileTreeNodeComponent({
+	node,
+	onFileSelect,
+	onDelete,
+	onRename,
+	onCreateFolder,
+	onCreateNote,
+	activePath,
+	level,
+}: FileTreeNodeProps) {
 	const [isOpen, setIsOpen] = React.useState(false);
 	const [isRenaming, setIsRenaming] = React.useState(false);
-	const isSelected = currentFile?.relativePath === node.relativePath;
+	const isSelected = activePath === node.relativePath;
+
+	const handleToggleOrSelect = React.useCallback(() => {
+		if (isRenaming) return;
+		if (node.kind === "directory") {
+			setIsOpen((prev) => !prev);
+		} else {
+			onFileSelect(node);
+		}
+	}, [isRenaming, node, onFileSelect]);
+
+	const handleStartRenaming = React.useCallback(() => {
+		if (!isRenaming) {
+			setIsRenaming(true);
+		}
+	}, [isRenaming]);
+
+	const handleDelete = React.useCallback(() => {
+		onDelete?.(node);
+	}, [node, onDelete]);
+
+	const handleCreateNote = React.useCallback(() => {
+		onCreateNote?.(node.handle as FileSystemDirectoryHandle);
+	}, [node, onCreateNote]);
+
+	const handleCreateFolder = React.useCallback(() => {
+		onCreateFolder?.(node.handle as FileSystemDirectoryHandle);
+	}, [node, onCreateFolder]);
 
 	const handleRenameSubmit = async (newName: string) => {
 		if (newName && newName !== node.name && onRename) {
@@ -292,15 +330,8 @@ function FileTreeNode({
 		>
 			<button
 				type="button"
-				onClick={() => {
-					if (isRenaming) return;
-					if (node.kind === "directory") {
-						setIsOpen(!isOpen);
-					} else {
-						onFileSelect(node);
-					}
-				}}
-				onDoubleClick={() => !isRenaming && setIsRenaming(true)}
+				onClick={handleToggleOrSelect}
+				onDoubleClick={handleStartRenaming}
 				className="flex flex-1 items-center gap-2 overflow-hidden text-left"
 			>
 				<HugeiconsIcon
@@ -333,14 +364,10 @@ function FileTreeNode({
 				<Actions
 					isSelected={isSelected}
 					isDirectory={node.kind === "directory"}
-					onRename={() => setIsRenaming(true)}
-					onDelete={() => onDelete?.(node)}
-					onCreateNote={() =>
-						onCreateNote?.(node.handle as FileSystemDirectoryHandle)
-					}
-					onCreateFolder={() =>
-						onCreateFolder?.(node.handle as FileSystemDirectoryHandle)
-					}
+					onRename={handleStartRenaming}
+					onDelete={handleDelete}
+					onCreateNote={handleCreateNote}
+					onCreateFolder={handleCreateFolder}
 				/>
 			)}
 		</div>
@@ -353,19 +380,11 @@ function FileTreeNode({
 				<ContextMenuContent>
 					{node.kind === "directory" && (
 						<>
-							<ContextMenuItem
-								onClick={() =>
-									onCreateNote?.(node.handle as FileSystemDirectoryHandle)
-								}
-							>
+							<ContextMenuItem onClick={handleCreateNote}>
 								<HugeiconsIcon icon={File01Icon} className="mr-2 h-3.5 w-3.5" />
 								<span>New Note</span>
 							</ContextMenuItem>
-							<ContextMenuItem
-								onClick={() =>
-									onCreateFolder?.(node.handle as FileSystemDirectoryHandle)
-								}
-							>
+							<ContextMenuItem onClick={handleCreateFolder}>
 								<HugeiconsIcon
 									icon={Folder01Icon}
 									className="mr-2 h-3.5 w-3.5"
@@ -374,17 +393,14 @@ function FileTreeNode({
 							</ContextMenuItem>
 						</>
 					)}
-					<ContextMenuItem onClick={() => setIsRenaming(true)}>
+					<ContextMenuItem onClick={handleStartRenaming}>
 						<HugeiconsIcon
 							icon={PencilEdit01Icon}
 							className="mr-2 h-3.5 w-3.5"
 						/>
 						<span>Rename</span>
 					</ContextMenuItem>
-					<ContextMenuItem
-						variant="destructive"
-						onClick={() => onDelete?.(node)}
-					>
+					<ContextMenuItem variant="destructive" onClick={handleDelete}>
 						<HugeiconsIcon icon={Delete01Icon} className="mr-2 h-3.5 w-3.5" />
 						<span>Delete</span>
 					</ContextMenuItem>
@@ -398,10 +414,35 @@ function FileTreeNode({
 					onRename={onRename}
 					onCreateFolder={onCreateFolder}
 					onCreateNote={onCreateNote}
-					currentFile={currentFile}
+					activePath={activePath}
 					level={level + 1}
 				/>
 			)}
 		</div>
 	);
 }
+
+function areFileTreeNodePropsEqual(
+	prev: FileTreeNodeProps,
+	next: FileTreeNodeProps,
+) {
+	const prevSelected = prev.activePath === prev.node.relativePath;
+	const nextSelected = next.activePath === next.node.relativePath;
+
+	return (
+		prev.node === next.node &&
+		prev.level === next.level &&
+		prev.onFileSelect === next.onFileSelect &&
+		prev.onDelete === next.onDelete &&
+		prev.onRename === next.onRename &&
+		prev.onCreateFolder === next.onCreateFolder &&
+		prev.onCreateNote === next.onCreateNote &&
+		prevSelected === nextSelected
+	);
+}
+
+const FileTreeNode = React.memo(
+	FileTreeNodeComponent,
+	areFileTreeNodePropsEqual,
+);
+FileTreeNode.displayName = "FileTreeNode";

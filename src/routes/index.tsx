@@ -36,6 +36,7 @@ export const Route = createFileRoute("/")({ component: App });
 const TABS_STORAGE_KEY = "mdwrite-tabs";
 const ACTIVE_PATH_STORAGE_KEY = "mdwrite-active-path";
 const SIDEBAR_OPEN_STORAGE_KEY = "mdwrite-sidebar-open";
+const CONTENT_STATE_SYNC_DELAY_MS = 180;
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
 	for (const node of nodes) {
@@ -60,6 +61,10 @@ function App() {
 	const [isCommandBarOpen, setIsCommandBarOpen] = React.useState(false);
 	const { showHiddenFiles } = useTheme();
 	const { shortcuts } = useKeyboardShortcuts();
+	const shortcutsRef = React.useRef(shortcuts);
+	React.useEffect(() => {
+		shortcutsRef.current = shortcuts;
+	}, [shortcuts]);
 	const [rootHandle, setRootHandle] =
 		React.useState<FileSystemDirectoryHandle | null>(null);
 	const [storedHandle, setStoredHandle] =
@@ -68,9 +73,69 @@ function App() {
 	const [tabs, setTabs] = React.useState<FileNode[]>([]);
 	const [activePath, setActivePath] = React.useState<string | null>(null);
 	const [content, setContent] = React.useState("");
+	const deferredContent = React.useDeferredValue(content);
 	const [isInitialLoading, setIsInitialLoading] = React.useState(true);
 	const lastModifiedRef = React.useRef<number>(0);
+	const contentRef = React.useRef(content);
+	const activePathRef = React.useRef<string | null>(activePath);
+	const saveTimeoutRef = React.useRef<Map<string, number>>(new Map());
+	const contentSyncTimeoutRef = React.useRef<number | null>(null);
+	const pendingContentRef = React.useRef<string | null>(null);
+	const pendingContentPathRef = React.useRef<string | null>(null);
 	const editorRef = React.useRef<EditorHandle>(null);
+
+	React.useEffect(() => {
+		contentRef.current = content;
+	}, [content]);
+
+	React.useEffect(() => {
+		activePathRef.current = activePath;
+	}, [activePath]);
+
+	const cancelPendingContentSync = React.useCallback(() => {
+		if (contentSyncTimeoutRef.current !== null) {
+			window.clearTimeout(contentSyncTimeoutRef.current);
+			contentSyncTimeoutRef.current = null;
+		}
+		pendingContentRef.current = null;
+		pendingContentPathRef.current = null;
+	}, []);
+
+	const setContentImmediate = React.useCallback(
+		(nextContent: string) => {
+			cancelPendingContentSync();
+			contentRef.current = nextContent;
+			setContent(nextContent);
+		},
+		[cancelPendingContentSync],
+	);
+
+	const flushPendingContentSync = React.useCallback(() => {
+		const pendingContent = pendingContentRef.current;
+		const pendingPath = pendingContentPathRef.current;
+		cancelPendingContentSync();
+
+		if (pendingContent === null) return;
+		if (pendingPath !== activePathRef.current) return;
+
+		setContent(pendingContent);
+	}, [cancelPendingContentSync]);
+
+	const scheduleContentSync = React.useCallback(
+		(nextContent: string, filePath: string | null) => {
+			pendingContentRef.current = nextContent;
+			pendingContentPathRef.current = filePath;
+
+			if (contentSyncTimeoutRef.current !== null) {
+				window.clearTimeout(contentSyncTimeoutRef.current);
+			}
+
+			contentSyncTimeoutRef.current = window.setTimeout(() => {
+				flushPendingContentSync();
+			}, CONTENT_STATE_SYNC_DELAY_MS);
+		},
+		[flushPendingContentSync],
+	);
 
 	const currentFile = React.useMemo(
 		() => tabs.find((t) => t.relativePath === activePath),
@@ -78,7 +143,7 @@ function App() {
 	);
 
 	const headings = React.useMemo(() => {
-		const lines = content.split("\n");
+		const lines = deferredContent.split("\n");
 		const result: { level: number; text: string; index: number }[] = [];
 		for (let i = 0; i < lines.length; i++) {
 			const match = lines[i].match(/^(#{1,6})\s+(.+)$/);
@@ -91,7 +156,7 @@ function App() {
 			}
 		}
 		return result;
-	}, [content]);
+	}, [deferredContent]);
 
 	const handleHeadingClick = (index: number) => {
 		const heading = headings.find((h) => h.index === index);
@@ -104,6 +169,11 @@ function App() {
 
 	// Intersection Observer for active heading
 	React.useEffect(() => {
+		if (headings.length === 0) {
+			setActiveHeadingIndex(undefined);
+			return;
+		}
+
 		const observer = new IntersectionObserver(
 			(entries) => {
 				const intersecting = entries
@@ -131,7 +201,9 @@ function App() {
 			},
 		);
 
-		const elements = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
+		const elements = document.querySelectorAll(
+			".ProseMirror h1, .ProseMirror h2, .ProseMirror h3, .ProseMirror h4, .ProseMirror h5, .ProseMirror h6",
+		);
 		for (const el of elements) observer.observe(el);
 
 		return () => observer.disconnect();
@@ -144,6 +216,9 @@ function App() {
 		},
 		[showHiddenFiles],
 	);
+
+	const handleNewFileRef = React.useRef<() => void>(() => {});
+	const handleOpenFolderRef = React.useRef<() => void>(() => {});
 
 	const handleOpenFolder = React.useCallback(async () => {
 		try {
@@ -161,6 +236,10 @@ function App() {
 		}
 	}, [refreshFiles]);
 
+	React.useEffect(() => {
+		handleOpenFolderRef.current = handleOpenFolder;
+	}, [handleOpenFolder]);
+
 	const handleReopenRecent = async () => {
 		if (storedHandle) {
 			const granted = await requestPermission(storedHandle);
@@ -172,16 +251,24 @@ function App() {
 		}
 	};
 
+	const handleSearchOpen = React.useCallback(() => {
+		setIsSearchOpen(true);
+	}, []);
+
 	const handleFileSelect = React.useCallback(
 		async (file: FileNode) => {
 			if (file.kind === "file") {
+				cancelPendingContentSync();
 				const isImage = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"].some(
 					(ext) => file.name.toLowerCase().endsWith(ext),
 				);
 
-				if (!tabs.find((t) => t.relativePath === file.relativePath)) {
-					setTabs((prev) => [...prev, file]);
-				}
+				setTabs((prev) => {
+					if (prev.some((t) => t.relativePath === file.relativePath)) {
+						return prev;
+					}
+					return [...prev, file];
+				});
 				setActivePath(file.relativePath);
 
 				if (!isImage) {
@@ -189,11 +276,11 @@ function App() {
 						file.handle as FileSystemFileHandle,
 					);
 					lastModifiedRef.current = lastModified;
-					setContent(text);
+					setContentImmediate(text);
 				}
 			}
 		},
-		[tabs],
+		[cancelPendingContentSync, setContentImmediate],
 	);
 
 	const handleTabClose = (path: string) => {
@@ -205,69 +292,77 @@ function App() {
 					handleFileSelect(nextTab);
 				} else {
 					setActivePath(null);
-					setContent("");
+					setContentImmediate("");
 				}
 			}
 			return newTabs;
 		});
 	};
 
-	const handleDeleteFile = async (node: FileNode) => {
-		if (!confirm(`Are you sure you want to delete "${node.name}"?`)) return;
+	const handleDeleteFile = React.useCallback(
+		async (node: FileNode) => {
+			if (!confirm(`Are you sure you want to delete "${node.name}"?`)) return;
 
-		try {
-			if (node.parentHandle) {
-				await node.parentHandle.removeEntry(node.name, { recursive: true });
-				if (rootHandle) await refreshFiles(rootHandle);
+			try {
+				if (node.parentHandle) {
+					await node.parentHandle.removeEntry(node.name, { recursive: true });
+					if (rootHandle) await refreshFiles(rootHandle);
 
-				setTabs((prev) =>
-					prev.filter((t) => !t.relativePath.startsWith(node.relativePath)),
-				);
-				if (activePath?.startsWith(node.relativePath)) {
-					setActivePath(null);
-					setContent("");
+					setTabs((prev) =>
+						prev.filter((t) => !t.relativePath.startsWith(node.relativePath)),
+					);
+					if (activePathRef.current?.startsWith(node.relativePath)) {
+						setActivePath(null);
+						setContentImmediate("");
+					}
 				}
+			} catch (err) {
+				console.error("Failed to delete", err);
+				alert(
+					"Failed to delete. It might be in use or you might not have permission.",
+				);
 			}
-		} catch (err) {
-			console.error("Failed to delete", err);
-			alert(
-				"Failed to delete. It might be in use or you might not have permission.",
-			);
-		}
-	};
+		},
+		[refreshFiles, rootHandle, setContentImmediate],
+	);
 
-	const handleRenameFile = async (node: FileNode, newName: string) => {
-		try {
-			// @ts-expect-error
-			if (typeof node.handle.move === "function") {
+	const handleRenameFile = React.useCallback(
+		async (node: FileNode, newName: string) => {
+			try {
 				// @ts-expect-error
-				await node.handle.move(newName);
-				if (rootHandle) await refreshFiles(rootHandle);
+				if (typeof node.handle.move === "function") {
+					// @ts-expect-error
+					await node.handle.move(newName);
+					if (rootHandle) await refreshFiles(rootHandle);
 
-				setTabs((prev) =>
-					prev.map((t) => {
-						if (t.relativePath === node.relativePath) {
-							const newRelativePath = t.relativePath.replace(
-								node.name,
-								newName,
-							);
-							return { ...t, name: newName, relativePath: newRelativePath };
-						}
-						return t;
-					}),
-				);
+					setTabs((prev) =>
+						prev.map((t) => {
+							if (t.relativePath === node.relativePath) {
+								const newRelativePath = t.relativePath.replace(
+									node.name,
+									newName,
+								);
+								return { ...t, name: newName, relativePath: newRelativePath };
+							}
+							return t;
+						}),
+					);
 
-				if (activePath === node.relativePath) {
-					setActivePath(node.relativePath.replace(node.name, newName));
+					if (activePathRef.current === node.relativePath) {
+						setActivePath(node.relativePath.replace(node.name, newName));
+					}
+				} else {
+					alert("Renaming is not supported in this browser.");
 				}
-			} else {
-				alert("Renaming is not supported in this browser.");
+			} catch (err) {
+				console.error("Failed to rename", err);
+				alert(
+					"Failed to rename. Check if a file with that name already exists.",
+				);
 			}
-		} catch (err) {
-			console.error("Failed to rename", err);
-			alert("Failed to rename. Check if a file with that name already exists.");
-		}
-	};
+		},
+		[refreshFiles, rootHandle],
+	);
 
 	const handleNewFile = React.useCallback(async () => {
 		if (!rootHandle) return;
@@ -290,6 +385,10 @@ function App() {
 			console.error("Failed to create file", err);
 		}
 	}, [rootHandle, refreshFiles, handleFileSelect]);
+
+	React.useEffect(() => {
+		handleNewFileRef.current = handleNewFile;
+	}, [handleNewFile]);
 
 	const handleCreateNote = React.useCallback(
 		async (parentHandle: FileSystemDirectoryHandle) => {
@@ -336,43 +435,74 @@ function App() {
 		[rootHandle, refreshFiles],
 	);
 
-	const handleContentChange = (newContent: string) => {
-		setContent(newContent);
-		if (currentFile && currentFile.handle.kind === "file") {
-			writeFile(currentFile.handle as FileSystemFileHandle, newContent)
-				.then((lastModified) => {
-					lastModifiedRef.current = lastModified;
-				})
-				.catch((err) => {
-					console.error("Failed to auto-save", err);
-				});
-		}
-	};
+	const handleContentChange = React.useCallback(
+		(newContent: string) => {
+			contentRef.current = newContent;
+			scheduleContentSync(newContent, currentFile?.relativePath ?? null);
 
-	const handleImageUpload = async (file: File) => {
-		if (!currentFile || !currentFile.parentHandle) return null;
+			if (!currentFile || currentFile.handle.kind !== "file") return;
 
-		try {
-			const assetsHandle = await currentFile.parentHandle.getDirectoryHandle(
-				"assets",
-				{ create: true },
-			);
+			const filePath = currentFile.relativePath;
+			const fileHandle = currentFile.handle as FileSystemFileHandle;
 
-			const fileHandle = await assetsHandle.getFileHandle(file.name, {
-				create: true,
+			const existingTimeout = saveTimeoutRef.current.get(filePath);
+			if (existingTimeout !== undefined) {
+				window.clearTimeout(existingTimeout);
+			}
+
+			const timeoutId = window.setTimeout(() => {
+				saveTimeoutRef.current.delete(filePath);
+				writeFile(fileHandle, newContent)
+					.then((lastModified) => {
+						lastModifiedRef.current = lastModified;
+					})
+					.catch((err) => {
+						console.error("Failed to auto-save", err);
+					});
+			}, 300);
+
+			saveTimeoutRef.current.set(filePath, timeoutId);
+		},
+		[currentFile, scheduleContentSync],
+	);
+
+	React.useEffect(() => {
+		return () => {
+			cancelPendingContentSync();
+			saveTimeoutRef.current.forEach((timeoutId) => {
+				window.clearTimeout(timeoutId);
 			});
-			const writable = await fileHandle.createWritable();
-			await writable.write(file);
-			await writable.close();
+			saveTimeoutRef.current.clear();
+		};
+	}, [cancelPendingContentSync]);
 
-			if (rootHandle) await refreshFiles(rootHandle);
+	const handleImageUpload = React.useCallback(
+		async (file: File) => {
+			if (!currentFile || !currentFile.parentHandle) return null;
 
-			return `./assets/${file.name}`;
-		} catch (err) {
-			console.error("Failed to upload image", err);
-			return null;
-		}
-	};
+			try {
+				const assetsHandle = await currentFile.parentHandle.getDirectoryHandle(
+					"assets",
+					{ create: true },
+				);
+
+				const fileHandle = await assetsHandle.getFileHandle(file.name, {
+					create: true,
+				});
+				const writable = await fileHandle.createWritable();
+				await writable.write(file);
+				await writable.close();
+
+				if (rootHandle) await refreshFiles(rootHandle);
+
+				return `./assets/${file.name}`;
+			} catch (err) {
+				console.error("Failed to upload image", err);
+				return null;
+			}
+		},
+		[currentFile, refreshFiles, rootHandle],
+	);
 
 	const handleResolveImagePath = React.useCallback(
 		async (path: string) => {
@@ -416,7 +546,7 @@ function App() {
 				description: "Search in all markdown files",
 				icon: Search01Icon as any,
 				shortcut: shortcuts.search,
-				perform: () => setIsSearchOpen(true),
+				perform: handleSearchOpen,
 			},
 			{
 				id: "command-bar",
@@ -443,13 +573,13 @@ function App() {
 				perform: handleOpenFolder,
 			},
 		],
-		[handleNewFile, handleOpenFolder, shortcuts],
+		[handleNewFile, handleOpenFolder, handleSearchOpen, shortcuts],
 	);
 
 	React.useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const checkShortcut = (actionId: string) => {
-				const combo = shortcuts[actionId];
+				const combo = shortcutsRef.current[actionId];
 				if (!combo) return false;
 
 				const hasCtrl = combo.includes("ctrl");
@@ -479,16 +609,16 @@ function App() {
 			}
 			if (checkShortcut("new-file")) {
 				e.preventDefault();
-				handleNewFile();
+				handleNewFileRef.current();
 			}
 			if (checkShortcut("open-folder")) {
 				e.preventDefault();
-				handleOpenFolder();
+				handleOpenFolderRef.current();
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, [shortcuts, handleNewFile, handleOpenFolder]);
+	}, []);
 
 	// Save state to localStorage
 	React.useEffect(() => {
@@ -517,14 +647,14 @@ function App() {
 		const init = async () => {
 			const showHiddenFilesOnInit =
 				localStorage.getItem("showHiddenFiles") === "true";
+			const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
+			const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
 			const recent = await getRecentFolder();
+
 			if (recent) {
 				setRootHandle(recent);
 				const tree = await getFileTree(recent, "", showHiddenFilesOnInit);
 				setFiles(tree);
-
-				const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
-				const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
 
 				if (savedTabs) {
 					try {
@@ -546,7 +676,7 @@ function App() {
 									activeNode.handle as FileSystemFileHandle,
 								);
 								lastModifiedRef.current = lastModified;
-								setContent(text);
+								setContentImmediate(text);
 							}
 						}
 					} catch (e) {
@@ -562,7 +692,7 @@ function App() {
 			setIsInitialLoading(false);
 		};
 		init();
-	}, []);
+	}, [setContentImmediate]);
 
 	React.useEffect(() => {
 		if (!currentFile || currentFile.handle.kind !== "file") return;
@@ -575,8 +705,8 @@ function App() {
 
 				if (file.lastModified > lastModifiedRef.current) {
 					const text = await file.text();
-					if (text !== content) {
-						setContent(text);
+					if (text !== contentRef.current) {
+						setContentImmediate(text);
 						lastModifiedRef.current = file.lastModified;
 					}
 				}
@@ -597,7 +727,7 @@ function App() {
 
 		const interval = setInterval(checkFile, 2000);
 		return () => clearInterval(interval);
-	}, [currentFile, content]);
+	}, [currentFile, setContentImmediate]);
 
 	if (isInitialLoading) {
 		return (
@@ -658,8 +788,8 @@ function App() {
 					onRename={handleRenameFile}
 					onCreateFolder={handleCreateFolder}
 					onCreateNote={handleCreateNote}
-					currentFile={currentFile}
-					onSearchOpen={() => setIsSearchOpen(true)}
+					activePath={activePath}
+					onSearchOpen={handleSearchOpen}
 				/>
 			)}
 			<main className="flex min-w-0 flex-1 flex-col bg-background">
