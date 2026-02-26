@@ -35,6 +35,7 @@ interface SidebarProps {
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onMove?: (node: FileNode, targetDirectory: FileNode) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	activePath?: string | null;
@@ -48,11 +49,52 @@ function SidebarComponent({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onMove,
 	onCreateFolder,
 	onCreateNote,
 	activePath,
 	onSearchOpen,
 }: SidebarProps) {
+	const [draggedPath, setDraggedPath] = React.useState<string | null>(null);
+	const [dropTargetPath, setDropTargetPath] = React.useState<string | null>(
+		null,
+	);
+	const draggedNodeRef = React.useRef<FileNode | null>(null);
+
+	const handleDragStart = React.useCallback((node: FileNode) => {
+		draggedNodeRef.current = node;
+		setDraggedPath(node.relativePath);
+	}, []);
+
+	const handleDragEnd = React.useCallback(() => {
+		draggedNodeRef.current = null;
+		setDraggedPath(null);
+		setDropTargetPath(null);
+	}, []);
+
+	const handleDropTargetChange = React.useCallback((path: string | null) => {
+		setDropTargetPath(path);
+	}, []);
+
+	const handleNodeDrop = React.useCallback(
+		async (targetDirectory: FileNode) => {
+			const draggedNode = draggedNodeRef.current;
+			if (!draggedNode || !onMove) return;
+
+			if (targetDirectory.kind !== "directory") return;
+			if (draggedNode.relativePath === targetDirectory.relativePath) return;
+			if (
+				draggedNode.kind === "directory" &&
+				targetDirectory.relativePath.startsWith(`${draggedNode.relativePath}/`)
+			) {
+				return;
+			}
+
+			await onMove(draggedNode, targetDirectory);
+		},
+		[onMove],
+	);
+
 	return (
 		<div className="flex h-full w-64 flex-col border-r bg-secondary/30">
 			<div className="px-2 pt-2">
@@ -73,9 +115,16 @@ function SidebarComponent({
 					onFileSelect={onFileSelect}
 					onDelete={onDelete}
 					onRename={onRename}
+					onMove={handleNodeDrop}
 					onCreateFolder={onCreateFolder}
 					onCreateNote={onCreateNote}
 					activePath={activePath}
+					draggedPath={draggedPath}
+					dropTargetPath={dropTargetPath}
+					onDragStart={handleDragStart}
+					onDragEnd={handleDragEnd}
+					onDropTargetChange={handleDropTargetChange}
+					getDraggedNode={() => draggedNodeRef.current}
 				/>
 			</div>
 
@@ -102,35 +151,218 @@ function FileTree({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onMove,
 	onCreateFolder,
 	onCreateNote,
 	activePath,
+	draggedPath,
+	dropTargetPath,
+	onDragStart,
+	onDragEnd,
+	onDropTargetChange,
+	getDraggedNode,
 	level = 0,
 }: {
 	nodes: FileNode[];
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onMove?: (targetDirectory: FileNode) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	activePath?: string | null;
+	draggedPath?: string | null;
+	dropTargetPath?: string | null;
+	onDragStart?: (node: FileNode) => void;
+	onDragEnd?: () => void;
+	onDropTargetChange?: (path: string | null) => void;
+	getDraggedNode?: () => FileNode | null;
 	level?: number;
 }) {
+	const flatNodes = React.useMemo(() => {
+		const result: { node: FileNode; index: number }[] = [];
+		const flatten = (items: FileNode[], idx: number) => {
+			for (const item of items) {
+				result.push({ node: item, index: idx++ });
+				if (item.kind === "directory" && item.children) {
+					idx = flatten(item.children, idx);
+				}
+			}
+			return idx;
+		};
+		flatten(nodes, 0);
+		return result;
+	}, [nodes]);
+
+	const flatIndexRef = React.useRef<Map<string, number>>(new Map());
+	React.useEffect(() => {
+		const map = new Map<string, number>();
+		flatNodes.forEach(({ node }, idx) => {
+			map.set(node.relativePath, idx);
+		});
+		flatIndexRef.current = map;
+	}, [flatNodes]);
+
+	const getParentDirectory = React.useCallback(
+		(node: FileNode): FileNode | null => {
+			if (!node.parentHandle) return null;
+			const parentPath = node.relativePath.slice(
+				0,
+				node.relativePath.length - node.name.length - 1,
+			);
+			const parentNode = flatNodes.find(
+				(n) =>
+					n.node.relativePath === parentPath && n.node.kind === "directory",
+			);
+			return parentNode?.node || null;
+		},
+		[flatNodes],
+	);
+
+	const dropIndexRef = React.useRef<number | null>(null);
+	const handleFileDrop = React.useCallback(
+		async (targetIndex: number) => {
+			const draggedNode = getDraggedNode ? getDraggedNode() : null;
+			if (!draggedNode || !onMove) return;
+
+			const targetEntry = flatNodes[targetIndex];
+			if (!targetEntry) return;
+
+			const targetNode = targetEntry.node;
+			if (targetNode.kind === "directory") {
+				await onMove(targetNode);
+			} else {
+				const parentDir = getParentDirectory(targetNode);
+				if (parentDir) {
+					await onMove(parentDir);
+				}
+			}
+		},
+		[flatNodes, getParentDirectory, getDraggedNode, onMove],
+	);
+
+	const handleDragOverFile = React.useCallback(
+		(e: React.DragEvent, index: number) => {
+			if (draggedPath === null) return;
+			e.preventDefault();
+			e.dataTransfer.dropEffect = "move";
+			const rect = e.currentTarget.getBoundingClientRect();
+			const midpoint = rect.top + rect.height / 2;
+			let newDropIndex: number;
+			if (e.clientY < midpoint) {
+				newDropIndex = index;
+			} else {
+				newDropIndex = index + 1;
+			}
+			if (newDropIndex !== dropIndexRef.current) {
+				dropIndexRef.current = newDropIndex;
+				onDropTargetChange?.(`__drop_index_${newDropIndex}`);
+			}
+		},
+		[draggedPath, onDropTargetChange],
+	);
+
+	const handleDragLeaveFile = React.useCallback(
+		(e: React.DragEvent) => {
+			if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+				dropIndexRef.current = null;
+				onDropTargetChange?.(null);
+			}
+		},
+		[onDropTargetChange],
+	);
+
+	const handleFileDropWrapper = React.useCallback(
+		(e: React.DragEvent) => {
+			e.preventDefault();
+			e.stopPropagation();
+			const targetIndex = dropIndexRef.current;
+			if (targetIndex !== null) {
+				void handleFileDrop(targetIndex);
+			}
+			dropIndexRef.current = null;
+			onDropTargetChange?.(null);
+			onDragEnd?.();
+		},
+		[handleFileDrop, onDropTargetChange, onDragEnd],
+	);
+
+	const isDropBetweenFiles =
+		draggedPath !== null && dropTargetPath?.startsWith("__drop_index_");
+
 	return (
-		<div className="flex flex-col gap-0.5">
-			{nodes.map((node) => (
-				<FileTreeNode
-					key={node.relativePath}
-					node={node}
-					onFileSelect={onFileSelect}
-					onDelete={onDelete}
-					onRename={onRename}
-					onCreateFolder={onCreateFolder}
-					onCreateNote={onCreateNote}
-					activePath={activePath}
-					level={level}
-				/>
-			))}
+		<div className="relative flex flex-col gap-0.5">
+			{nodes.map((node) => {
+				const flatIdx = flatIndexRef.current.get(node.relativePath) ?? 0;
+				const isFile = node.kind === "file";
+				const currentDropIndex = dropTargetPath
+					? Number.parseInt(dropTargetPath.replace("__drop_index_", ""), 10)
+					: null;
+				const isDropPositionBefore =
+					isFile &&
+					isDropBetweenFiles &&
+					currentDropIndex === flatIdx &&
+					draggedPath !== node.relativePath;
+				const isDropPositionAfter =
+					isFile &&
+					isDropBetweenFiles &&
+					currentDropIndex === flatIdx + 1 &&
+					draggedPath !== node.relativePath;
+
+				return (
+					<React.Fragment key={node.relativePath}>
+						{isFile ? (
+							<div
+								role="none"
+								className="relative"
+								onDragOver={(e) => handleDragOverFile(e, flatIdx)}
+								onDragLeave={handleDragLeaveFile}
+								onDrop={handleFileDropWrapper}
+							>
+								{isDropPositionBefore && (
+									<div className="absolute -top-px left-0 right-0 h-0.5 bg-primary" />
+								)}
+								<FileTreeNode
+									node={node}
+									onFileSelect={onFileSelect}
+									onDelete={onDelete}
+									onRename={onRename}
+									onMove={onMove}
+									onCreateFolder={onCreateFolder}
+									onCreateNote={onCreateNote}
+									activePath={activePath}
+									draggedPath={draggedPath}
+									dropTargetPath={dropTargetPath}
+									onDragStart={onDragStart}
+									onDragEnd={onDragEnd}
+									onDropTargetChange={onDropTargetChange}
+									level={level}
+								/>
+								{isDropPositionAfter && (
+									<div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary" />
+								)}
+							</div>
+						) : (
+							<FileTreeNode
+								node={node}
+								onFileSelect={onFileSelect}
+								onDelete={onDelete}
+								onRename={onRename}
+								onMove={onMove}
+								onCreateFolder={onCreateFolder}
+								onCreateNote={onCreateNote}
+								activePath={activePath}
+								draggedPath={draggedPath}
+								dropTargetPath={dropTargetPath}
+								onDragStart={onDragStart}
+								onDragEnd={onDragEnd}
+								onDropTargetChange={onDropTargetChange}
+								level={level}
+							/>
+						)}
+					</React.Fragment>
+				);
+			})}
 		</div>
 	);
 }
@@ -258,9 +490,15 @@ type FileTreeNodeProps = {
 	onFileSelect: (file: FileNode) => void;
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
+	onMove?: (targetDirectory: FileNode) => Promise<void>;
 	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
 	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
 	activePath?: string | null;
+	draggedPath?: string | null;
+	dropTargetPath?: string | null;
+	onDragStart?: (node: FileNode) => void;
+	onDragEnd?: () => void;
+	onDropTargetChange?: (path: string | null) => void;
 	level: number;
 };
 
@@ -269,9 +507,15 @@ function FileTreeNodeComponent({
 	onFileSelect,
 	onDelete,
 	onRename,
+	onMove,
 	onCreateFolder,
 	onCreateNote,
 	activePath,
+	draggedPath,
+	dropTargetPath,
+	onDragStart,
+	onDragEnd,
+	onDropTargetChange,
 	level,
 }: FileTreeNodeProps) {
 	const [isOpen, setIsOpen] = React.useState(false);
@@ -316,22 +560,101 @@ function FileTreeNodeComponent({
 		(ext) => node.name.toLowerCase().endsWith(ext),
 	);
 
+	const dropTargetDirectory = React.useMemo(() => {
+		if (draggedPath === null || draggedPath === node.relativePath) return null;
+		if (node.relativePath.startsWith(`${draggedPath}/`)) return null;
+		if (node.kind === "directory") return node;
+		if (node.parentHandle) {
+			return {
+				...node,
+				kind: "directory" as const,
+				handle: node.parentHandle,
+				relativePath: node.relativePath.slice(
+					0,
+					node.relativePath.length - node.name.length - 1,
+				),
+			};
+		}
+		return null;
+	}, [draggedPath, node]);
+
+	const isDropTarget = dropTargetPath === node.relativePath;
+
+	// eslint-disable-next-line jsx-a11y/no-static-element-interactions
 	const nodeContent = (
 		<div
+			role="button"
+			tabIndex={0}
 			className={cn(
 				"group flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors",
 				isSelected
 					? "bg-secondary text-secondary-foreground"
 					: "text-muted-foreground hover:bg-secondary/50 hover:text-foreground",
+				draggedPath === node.relativePath && "opacity-50",
+				node.kind === "directory" &&
+					dropTargetDirectory &&
+					isDropTarget &&
+					"bg-primary/10 text-foreground",
 				"focus-within:outline-none",
 				node.kind === "directory" && "text-muted-foreground",
 			)}
 			style={{ paddingLeft: `${level * 12 + 8}px` }}
+			onDragOver={
+				node.kind === "directory"
+					? (e) => {
+							if (!dropTargetDirectory) return;
+							e.preventDefault();
+							e.dataTransfer.dropEffect = "move";
+							onDropTargetChange?.(node.relativePath);
+						}
+					: undefined
+			}
+			onDragLeave={
+				node.kind === "directory"
+					? (e) => {
+							if (!dropTargetDirectory) return;
+							if (e.currentTarget.contains(e.relatedTarget as Node | null))
+								return;
+							onDropTargetChange?.(null);
+						}
+					: undefined
+			}
+			onDrop={
+				node.kind === "directory"
+					? (e) => {
+							if (!dropTargetDirectory || !onMove) return;
+							e.preventDefault();
+							onDropTargetChange?.(null);
+							void onMove(dropTargetDirectory);
+							onDragEnd?.();
+						}
+					: undefined
+			}
 		>
 			<button
 				type="button"
 				onClick={handleToggleOrSelect}
 				onDoubleClick={handleStartRenaming}
+				draggable={!isRenaming}
+				onDragStart={(e) => {
+					e.stopPropagation();
+					e.dataTransfer.effectAllowed = "move";
+					e.dataTransfer.setData("text/plain", node.relativePath);
+					onDragStart?.(node);
+				}}
+				onDragEnd={() => {
+					onDragEnd?.();
+				}}
+				onDrop={
+					node.kind === "file" && dropTargetDirectory
+						? (e) => {
+								e.preventDefault();
+								e.stopPropagation();
+								void onMove?.(dropTargetDirectory);
+								onDragEnd?.();
+							}
+						: undefined
+				}
 				className="flex flex-1 items-center gap-2 overflow-hidden text-left"
 			>
 				<HugeiconsIcon
@@ -412,9 +735,15 @@ function FileTreeNodeComponent({
 					onFileSelect={onFileSelect}
 					onDelete={onDelete}
 					onRename={onRename}
+					onMove={onMove}
 					onCreateFolder={onCreateFolder}
 					onCreateNote={onCreateNote}
 					activePath={activePath}
+					draggedPath={draggedPath}
+					dropTargetPath={dropTargetPath}
+					onDragStart={onDragStart}
+					onDragEnd={onDragEnd}
+					onDropTargetChange={onDropTargetChange}
 					level={level + 1}
 				/>
 			)}
@@ -435,8 +764,14 @@ function areFileTreeNodePropsEqual(
 		prev.onFileSelect === next.onFileSelect &&
 		prev.onDelete === next.onDelete &&
 		prev.onRename === next.onRename &&
+		prev.onMove === next.onMove &&
 		prev.onCreateFolder === next.onCreateFolder &&
 		prev.onCreateNote === next.onCreateNote &&
+		prev.draggedPath === next.draggedPath &&
+		prev.dropTargetPath === next.dropTargetPath &&
+		prev.onDragStart === next.onDragStart &&
+		prev.onDragEnd === next.onDragEnd &&
+		prev.onDropTargetChange === next.onDropTargetChange &&
 		prevSelected === nextSelected
 	);
 }

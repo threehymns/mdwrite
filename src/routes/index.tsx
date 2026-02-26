@@ -364,6 +364,82 @@ function App() {
 		[refreshFiles, rootHandle],
 	);
 
+	const handleMoveFile = React.useCallback(
+		async (node: FileNode, targetDirectory: FileNode) => {
+			if (targetDirectory.kind !== "directory") return;
+			if (node.relativePath === targetDirectory.relativePath) return;
+			if (
+				node.kind === "directory" &&
+				targetDirectory.relativePath.startsWith(`${node.relativePath}/`)
+			) {
+				return;
+			}
+
+			try {
+				const targetHandle =
+					targetDirectory.handle as FileSystemDirectoryHandle;
+				if (node.parentHandle) {
+					const sameParent = await node.parentHandle.isSameEntry(targetHandle);
+					if (sameParent) return;
+				}
+
+				// @ts-expect-error - move() is available in supporting browsers
+				if (typeof node.handle.move === "function") {
+					try {
+						// @ts-expect-error - move() is available in supporting browsers
+						await node.handle.move(targetHandle);
+
+						const oldPrefix = node.relativePath;
+						const newPrefix = `${targetDirectory.relativePath}/${node.name}`;
+
+						setTabs((prev) =>
+							prev.map((tab) => {
+								if (
+									tab.relativePath !== oldPrefix &&
+									!tab.relativePath.startsWith(`${oldPrefix}/`)
+								) {
+									return tab;
+								}
+								return {
+									...tab,
+									relativePath: `${newPrefix}${tab.relativePath.slice(oldPrefix.length)}`,
+								};
+							}),
+						);
+
+						if (
+							activePathRef.current === oldPrefix ||
+							activePathRef.current?.startsWith(`${oldPrefix}/`)
+						) {
+							setActivePath(
+								`${newPrefix}${activePathRef.current.slice(oldPrefix.length)}`,
+							);
+						}
+
+						if (rootHandle) await refreshFiles(rootHandle);
+					} catch (err) {
+						console.error("Failed to move:", err);
+						alert(
+							node.kind === "directory"
+								? "Moving folders failed. They may need to be empty."
+								: "Failed to move. Check for permissions or name conflicts.",
+						);
+					}
+				} else {
+					alert(
+						node.kind === "directory"
+							? "Moving folders is not supported in this browser."
+							: "Moving files is not supported in this browser.",
+					);
+				}
+			} catch (err) {
+				console.error("Failed to move", err);
+				alert("Failed to move. Check for permissions or name conflicts.");
+			}
+		},
+		[refreshFiles, rootHandle],
+	);
+
 	const handleNewFile = React.useCallback(async () => {
 		if (!rootHandle) return;
 		const fileName = prompt("Enter file name (e.g. notes.md)");
@@ -786,6 +862,7 @@ function App() {
 					onFileSelect={handleFileSelect}
 					onDelete={handleDeleteFile}
 					onRename={handleRenameFile}
+					onMove={handleMoveFile}
 					onCreateFolder={handleCreateFolder}
 					onCreateNote={handleCreateNote}
 					activePath={activePath}
