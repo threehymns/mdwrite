@@ -3,7 +3,10 @@ import {
 	CheckmarkCircle02Icon,
 	Delete01Icon,
 	File01Icon,
+	FileAddIcon,
 	Folder01Icon,
+	Folder03Icon,
+	FolderAddIcon,
 	Image01Icon,
 	MoreVerticalIcon,
 	PencilEdit01Icon,
@@ -461,11 +464,14 @@ const Actions = React.memo(function Actions({
 				{isDirectory && (
 					<>
 						<DropdownMenuItem onClick={onCreateNote}>
-							<HugeiconsIcon icon={File01Icon} className="mr-2 h-3.5 w-3.5" />
+							<HugeiconsIcon icon={FileAddIcon} className="mr-2 h-3.5 w-3.5" />
 							<span>New Note</span>
 						</DropdownMenuItem>
 						<DropdownMenuItem onClick={onCreateFolder}>
-							<HugeiconsIcon icon={Folder01Icon} className="mr-2 h-3.5 w-3.5" />
+							<HugeiconsIcon
+								icon={FolderAddIcon}
+								className="mr-2 h-3.5 w-3.5"
+							/>
 							<span>New Folder</span>
 						</DropdownMenuItem>
 					</>
@@ -660,7 +666,9 @@ function FileTreeNodeComponent({
 				<HugeiconsIcon
 					icon={
 						node.kind === "directory"
-							? Folder01Icon
+							? isOpen
+								? Folder03Icon
+								: Folder01Icon
 							: isImage
 								? Image01Icon
 								: File01Icon
@@ -704,12 +712,15 @@ function FileTreeNodeComponent({
 					{node.kind === "directory" && (
 						<>
 							<ContextMenuItem onClick={handleCreateNote}>
-								<HugeiconsIcon icon={File01Icon} className="mr-2 h-3.5 w-3.5" />
+								<HugeiconsIcon
+									icon={FileAddIcon}
+									className="mr-2 h-3.5 w-3.5"
+								/>
 								<span>New Note</span>
 							</ContextMenuItem>
 							<ContextMenuItem onClick={handleCreateFolder}>
 								<HugeiconsIcon
-									icon={Folder01Icon}
+									icon={FolderAddIcon}
 									className="mr-2 h-3.5 w-3.5"
 								/>
 								<span>New Folder</span>
