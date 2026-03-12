@@ -63,6 +63,7 @@ interface EditorProps {
 	onImageUpload?: (file: File) => Promise<string | null>;
 	resolveImagePath?: (path: string) => Promise<string | null>;
 	active?: boolean;
+	onFrontmatterTrigger?: () => void;
 }
 
 export interface EditorHandle {
@@ -104,12 +105,18 @@ function EditorComponent({
 	resolveImagePath,
 	editorRef,
 	active,
+	onFrontmatterTrigger,
 }: EditorComponentProps) {
 	const lastContentRef = React.useRef(content);
 	const onChangeRef = React.useRef(onChange);
 	const activeRef = React.useRef(active);
+	const onFrontmatterTriggerRef = React.useRef(onFrontmatterTrigger);
 	const markdownSyncTimeoutRef = React.useRef<number | null>(null);
 	const pendingMarkdownEditorRef = React.useRef<TiptapEditor | null>(null);
+
+	React.useEffect(() => {
+		onFrontmatterTriggerRef.current = onFrontmatterTrigger;
+	}, [onFrontmatterTrigger]);
 
 	const flushPendingMarkdown = React.useCallback(() => {
 		const pendingEditor = pendingMarkdownEditorRef.current;
@@ -187,6 +194,24 @@ function EditorComponent({
 		onUpdate: ({ editor, transaction }) => {
 			if (!activeRef.current) return;
 			if (!transaction.docChanged) return;
+
+			// Check for --- at the beginning (could be hr node from markdown extension)
+			const firstNode = editor.state.doc.firstChild;
+			const text = editor.getText();
+			const firstLine = text.split("\n")[0];
+
+			if (
+				(firstLine.trim() === "---" ||
+					firstNode?.type.name === "horizontalRule") &&
+				onFrontmatterTriggerRef.current
+			) {
+				// Replace the first ---/hr with empty content
+				const tr = editor.state.tr;
+				tr.delete(0, editor.state.doc.content.size);
+				editor.view.dispatch(tr);
+				onFrontmatterTriggerRef.current();
+			}
+
 			scheduleMarkdownSync(editor);
 		},
 		onBlur: () => {

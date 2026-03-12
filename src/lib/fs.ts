@@ -1,4 +1,6 @@
 import { get, set } from "idb-keyval";
+import { type Searchable, extractTags, matchQuery } from "./search";
+import { type Frontmatter, parseFrontmatter, serializeFrontmatter } from "./markdown";
 
 const RECENT_FOLDER_KEY = "recent-folder-handle";
 
@@ -9,6 +11,7 @@ export interface FileNode {
 	children?: FileNode[];
 	relativePath: string;
 	parentHandle?: FileSystemDirectoryHandle;
+	icon?: any;
 }
 
 const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
@@ -109,7 +112,6 @@ export async function searchFiles(
 	relativePath = "",
 ): Promise<{ node: FileNode; snippet: string }[]> {
 	const results: { node: FileNode; snippet: string }[] = [];
-	const lowerQuery = query.toLowerCase();
 
 	// @ts-expect-error
 	for await (const entry of dirHandle.values()) {
@@ -127,12 +129,40 @@ export async function searchFiles(
 		} else if (entry.name.endsWith(".md")) {
 			const file = await (entry as FileSystemFileHandle).getFile();
 			const content = await file.text();
-			const lowerContent = content.toLowerCase();
 
-			if (lowerContent.includes(lowerQuery)) {
-				const index = lowerContent.indexOf(lowerQuery);
+			const searchable: Searchable = {
+				label: entry.name,
+				path: entryRelativePath,
+				content,
+				tags: extractTags(content),
+			};
+
+			if (matchQuery(query, searchable)) {
+				// Snippet logic: try to find a relevant content match
+				// We'll use a simple heuristic: find the first non-operator term that matches in content
+				const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+				let matchingTerm = "";
+				for (const term of terms) {
+					if (
+						!term.includes(":") &&
+						!term.startsWith("-") &&
+						!term.startsWith("/")
+					) {
+						if (content.toLowerCase().includes(term.toLowerCase())) {
+							matchingTerm = term;
+							break;
+						}
+					}
+				}
+
+				const lowerContent = content.toLowerCase();
+				const lowerTerm = matchingTerm.toLowerCase() || query.toLowerCase();
+				const index = lowerContent.includes(lowerTerm)
+					? lowerContent.indexOf(lowerTerm)
+					: 0;
+
 				const start = Math.max(0, index - 40);
-				const end = Math.min(content.length, index + lowerQuery.length + 40);
+				const end = Math.min(content.length, index + lowerTerm.length + 40);
 				let snippet = content.substring(start, end);
 				if (start > 0) snippet = `...${snippet}`;
 				if (end < content.length) snippet = `${snippet}...`;

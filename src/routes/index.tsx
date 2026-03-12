@@ -1,5 +1,6 @@
 import {
 	FolderOpenIcon,
+	NeuralNetworkIcon,
 	PlusSignIcon,
 	Search01Icon,
 	SidebarLeft01Icon,
@@ -10,6 +11,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import * as React from "react";
 import { CommandBar } from "@/components/command-bar";
 import { Editor, type EditorHandle } from "@/components/editor";
+import type { Property } from "@/components/frontmatter-editor";
+import {
+	frontmatterToProperties,
+	InlineFrontmatterEditor,
+	serializeProperties,
+} from "@/components/frontmatter-editor";
+import { GraphTab } from "@/components/graph-tab";
 import { ImageTab } from "@/components/image-tab";
 import { SearchDialog } from "@/components/search-dialog";
 import { Sidebar } from "@/components/sidebar";
@@ -29,6 +37,7 @@ import {
 	saveRecentFolder,
 	writeFile,
 } from "@/lib/fs";
+import { type Frontmatter, parseFrontmatter, serializeFrontmatter } from "@/lib/markdown";
 import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/")({ component: App });
@@ -37,6 +46,7 @@ const TABS_STORAGE_KEY = "mdwrite-tabs";
 const ACTIVE_PATH_STORAGE_KEY = "mdwrite-active-path";
 const SIDEBAR_OPEN_STORAGE_KEY = "mdwrite-sidebar-open";
 const CONTENT_STATE_SYNC_DELAY_MS = 180;
+const GRAPH_TAB_PATH = "__graph_view__";
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
 	for (const node of nodes) {
@@ -47,6 +57,15 @@ function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
 		}
 	}
 	return null;
+}
+
+function createGraphTabNode(handle: FileSystemHandle): FileNode {
+	return {
+		name: "Graph View",
+		kind: "file",
+		handle,
+		relativePath: GRAPH_TAB_PATH,
+	};
 }
 
 function App() {
@@ -73,6 +92,7 @@ function App() {
 	const [tabs, setTabs] = React.useState<FileNode[]>([]);
 	const [activePath, setActivePath] = React.useState<string | null>(null);
 	const [content, setContent] = React.useState("");
+	const [properties, setProperties] = React.useState<Property[]>([]);
 	const deferredContent = React.useDeferredValue(content);
 	const [isInitialLoading, setIsInitialLoading] = React.useState(true);
 	const lastModifiedRef = React.useRef<number>(0);
@@ -255,9 +275,32 @@ function App() {
 		setIsSearchOpen(true);
 	}, []);
 
+	const openGraphViewTab = React.useCallback(() => {
+		if (!rootHandle) return;
+		const graphTab = createGraphTabNode(rootHandle);
+		setTabs((prev) => {
+			if (prev.some((tab) => tab.relativePath === GRAPH_TAB_PATH)) {
+				return prev;
+			}
+			return [...prev, graphTab];
+		});
+		setActivePath(GRAPH_TAB_PATH);
+	}, [rootHandle]);
+
 	const handleFileSelect = React.useCallback(
 		async (file: FileNode) => {
 			if (file.kind === "file") {
+				if (file.relativePath === GRAPH_TAB_PATH) {
+					setTabs((prev) => {
+						if (prev.some((tab) => tab.relativePath === GRAPH_TAB_PATH)) {
+							return prev;
+						}
+						return [...prev, file];
+					});
+					setActivePath(GRAPH_TAB_PATH);
+					return;
+				}
+
 				cancelPendingContentSync();
 				const isImage = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"].some(
 					(ext) => file.name.toLowerCase().endsWith(ext),
@@ -276,11 +319,27 @@ function App() {
 						file.handle as FileSystemFileHandle,
 					);
 					lastModifiedRef.current = lastModified;
-					setContentImmediate(text);
+					const {
+						frontmatter: fm,
+						hasFrontmatter,
+						body,
+					} = parseFrontmatter(text);
+					const props = hasFrontmatter ? frontmatterToProperties(fm) : [];
+					setProperties(props);
+					setContentImmediate(hasFrontmatter ? body : text);
 				}
 			}
 		},
 		[cancelPendingContentSync, setContentImmediate],
+	);
+
+	const handleOpenGraphFile = React.useCallback(
+		(path: string) => {
+			const fileNode = findNodeByPath(files, path);
+			if (!fileNode || fileNode.kind !== "file") return;
+			void handleFileSelect(fileNode);
+		},
+		[files, handleFileSelect],
 	);
 
 	const handleTabClose = (path: string) => {
@@ -528,7 +587,9 @@ function App() {
 
 			const timeoutId = window.setTimeout(() => {
 				saveTimeoutRef.current.delete(filePath);
-				writeFile(fileHandle, newContent)
+				const fmStr = serializeProperties(properties);
+				const fullContent = fmStr + newContent;
+				writeFile(fileHandle, fullContent)
 					.then((lastModified) => {
 						lastModifiedRef.current = lastModified;
 					})
@@ -539,7 +600,7 @@ function App() {
 
 			saveTimeoutRef.current.set(filePath, timeoutId);
 		},
-		[currentFile, scheduleContentSync],
+		[currentFile, scheduleContentSync, properties],
 	);
 
 	React.useEffect(() => {
@@ -633,6 +694,13 @@ function App() {
 				perform: () => setIsCommandBarOpen(true),
 			},
 			{
+				id: "graph-view",
+				title: "Graph View",
+				description: "Open graph view",
+				icon: Search01Icon as any,
+				perform: openGraphViewTab,
+			},
+			{
 				id: "toggle-sidebar",
 				title: "Toggle Sidebar",
 				description: "Show or hide the file sidebar",
@@ -649,7 +717,13 @@ function App() {
 				perform: handleOpenFolder,
 			},
 		],
-		[handleNewFile, handleOpenFolder, handleSearchOpen, shortcuts],
+		[
+			handleNewFile,
+			handleOpenFolder,
+			handleSearchOpen,
+			openGraphViewTab,
+			shortcuts,
+		],
 	);
 
 	React.useEffect(() => {
@@ -737,6 +811,10 @@ function App() {
 						const paths = JSON.parse(savedTabs) as string[];
 						const restoredTabs: FileNode[] = [];
 						for (const path of paths) {
+							if (path === GRAPH_TAB_PATH) {
+								restoredTabs.push(createGraphTabNode(recent));
+								continue;
+							}
 							const node = findNodeByPath(tree, path);
 							if (node) restoredTabs.push(node);
 						}
@@ -748,11 +826,25 @@ function App() {
 							);
 							if (activeNode) {
 								setActivePath(activeNode.relativePath);
-								const { content: text, lastModified } = await readFile(
-									activeNode.handle as FileSystemFileHandle,
-								);
-								lastModifiedRef.current = lastModified;
-								setContentImmediate(text);
+								if (activeNode.relativePath === GRAPH_TAB_PATH) {
+									setContentImmediate("");
+									setProperties([]);
+								} else {
+									const { content: text, lastModified } = await readFile(
+										activeNode.handle as FileSystemFileHandle,
+									);
+									lastModifiedRef.current = lastModified;
+									const {
+										frontmatter: fm,
+										hasFrontmatter,
+										body,
+									} = parseFrontmatter(text);
+									const props = hasFrontmatter
+										? frontmatterToProperties(fm)
+										: [];
+									setProperties(props);
+									setContentImmediate(hasFrontmatter ? body : text);
+								}
 							}
 						}
 					} catch (e) {
@@ -782,7 +874,16 @@ function App() {
 				if (file.lastModified > lastModifiedRef.current) {
 					const text = await file.text();
 					if (text !== contentRef.current) {
-						setContentImmediate(text);
+						const {
+							frontmatter: fm,
+							hasFrontmatter,
+							body,
+						} = parseFrontmatter(text);
+						const props = hasFrontmatter
+							? frontmatterToProperties(fm, properties)
+							: [];
+						setProperties(props);
+						setContentImmediate(hasFrontmatter ? body : text);
 						lastModifiedRef.current = file.lastModified;
 					}
 				}
@@ -803,7 +904,7 @@ function App() {
 
 		const interval = setInterval(checkFile, 2000);
 		return () => clearInterval(interval);
-	}, [currentFile, setContentImmediate]);
+	}, [currentFile, setContentImmediate, properties]);
 
 	if (isInitialLoading) {
 		return (
@@ -853,6 +954,7 @@ function App() {
 		".svg",
 		".webp",
 	].some((ext) => currentFile?.name.toLowerCase().endsWith(ext));
+	const currentIsGraph = currentFile?.relativePath === GRAPH_TAB_PATH;
 
 	return (
 		<div className="flex h-screen overflow-hidden text-foreground">
@@ -916,15 +1018,52 @@ function App() {
 						rootHandle={rootHandle}
 						onFileSelect={handleFileSelect}
 					/>
-					{currentFile && !currentIsImage && (
-						<TableOfContents
-							headings={headings}
-							onHeadingClick={handleHeadingClick}
-							activeHeadingIndex={activeHeadingIndex}
-						/>
+					{currentFile && !currentIsImage && !currentIsGraph && (
+						<>
+							{properties.length > 0 && (
+								<InlineFrontmatterEditor
+									properties={properties}
+									onChange={(newProps) => {
+										setProperties(newProps);
+										const hasEmptyKeys = newProps.some(
+											(p) => p.key.trim() === "",
+										);
+										if (hasEmptyKeys) return;
+										const fmStr = serializeProperties(newProps);
+										const fullContent = fmStr + content;
+										if (currentFile && currentFile.handle.kind === "file") {
+											const fileHandle =
+												currentFile.handle as FileSystemFileHandle;
+											writeFile(fileHandle, fullContent)
+												.then((lastModified) => {
+													lastModifiedRef.current = lastModified;
+												})
+												.catch(console.error);
+										}
+									}}
+									onClose={() => {}}
+								/>
+							)}
+							<TableOfContents
+								headings={headings}
+								onHeadingClick={handleHeadingClick}
+								activeHeadingIndex={activeHeadingIndex}
+							/>
+						</>
 					)}
 					<div className="relative flex flex-1 flex-col overflow-hidden">
 						{tabs.map((tab) => {
+							if (tab.relativePath === GRAPH_TAB_PATH) {
+								if (tab.relativePath !== activePath) return null;
+								return (
+									<GraphTab
+										key={tab.relativePath}
+										files={files}
+										onOpenFilePath={handleOpenGraphFile}
+									/>
+								);
+							}
+
 							const isImage = [
 								".png",
 								".jpg",
@@ -954,6 +1093,9 @@ function App() {
 												tab.relativePath === activePath ? editorRef : undefined
 											}
 											active={tab.relativePath === activePath}
+											onFrontmatterTrigger={() => {
+												setProperties([{ key: "", type: "text", value: "" }]);
+											}}
 										/>
 									</div>
 								</React.Activity>

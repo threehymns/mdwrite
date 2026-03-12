@@ -13,12 +13,33 @@ interface SearchDialogProps {
 
 function HighlightedText({
 	text,
-	highlight,
+	query,
 }: {
 	text: string;
-	highlight: string;
+	query: string;
 }) {
-	if (!highlight.trim()) {
+	if (!query.trim()) {
+		return <span>{text}</span>;
+	}
+
+	// Try to find the most relevant term to highlight
+	const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+	let highlight = "";
+	for (const term of terms) {
+		if (
+			!term.includes(":") &&
+			!term.startsWith("-") &&
+			!term.startsWith("/")
+		) {
+			const cleaned = term.replace(/"/g, "");
+			if (text.toLowerCase().includes(cleaned.toLowerCase())) {
+				highlight = cleaned;
+				break;
+			}
+		}
+	}
+
+	if (!highlight) {
 		return <span>{text}</span>;
 	}
 
@@ -124,7 +145,7 @@ export function SearchDialog({
 								</span>
 							</div>
 							<div className="line-clamp-2 text-muted-foreground text-xs">
-								<HighlightedText text={result.snippet} highlight={query} />
+								<HighlightedText text={result.snippet} query={query} />
 							</div>
 						</button>
 					))
