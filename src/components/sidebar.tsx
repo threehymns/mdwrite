@@ -32,6 +32,7 @@ import {
 import type { FileNode } from "@/lib/fs";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface SidebarProps {
 	files: FileNode[];
@@ -112,7 +113,7 @@ function SidebarComponent({
 					<span>Search</span>
 				</Button>
 			</div>
-			<div className="flex-1 overflow-auto p-2">
+			<ScrollArea className="h-0 flex-1 p-2">
 				<FileTree
 					nodes={files}
 					onFileSelect={onFileSelect}
@@ -129,7 +130,7 @@ function SidebarComponent({
 					onDropTargetChange={handleDropTargetChange}
 					getDraggedNode={() => draggedNodeRef.current}
 				/>
-			</div>
+			</ScrollArea>
 
 			<div className="border-t p-2">
 				<Link to="/settings">
