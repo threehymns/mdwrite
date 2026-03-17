@@ -4,6 +4,7 @@ import {
 	type Editor as TiptapEditor,
 } from "@tiptap/core";
 import CharacterCount from "@tiptap/extension-character-count";
+import Link, { isAllowedUri } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
@@ -11,8 +12,13 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import * as React from "react";
 import { Markdown } from "tiptap-markdown";
+import {
+	parseInternalLinkHref,
+	serializeInternalLinkMarkdown,
+} from "@/lib/internal-links";
 import { CodeBlockCodeMirror } from "./editor/extensions/code-block-codemirror";
 import { ImageWithResolver } from "./editor/extensions/image-with-resolver";
+import { InternalLinkMarkdown } from "./editor/extensions/internal-link-markdown";
 import { SlashCommand, suggestion } from "./editor/extensions/slash-command";
 
 const TaskListInputRule = Extension.create({
@@ -64,6 +70,7 @@ interface EditorProps {
 	resolveImagePath?: (path: string) => Promise<string | null>;
 	active?: boolean;
 	onFrontmatterTrigger?: () => void;
+	onInternalLinkClick?: (target: string) => void;
 }
 
 export interface EditorHandle {
@@ -85,7 +92,8 @@ function areEditorPropsEqual(
 			prev.onChange === next.onChange &&
 			prev.onImageUpload === next.onImageUpload &&
 			prev.resolveImagePath === next.resolveImagePath &&
-			prev.editorRef === next.editorRef
+			prev.editorRef === next.editorRef &&
+			prev.onInternalLinkClick === next.onInternalLinkClick
 		);
 	}
 
@@ -94,7 +102,8 @@ function areEditorPropsEqual(
 		prev.onChange === next.onChange &&
 		prev.onImageUpload === next.onImageUpload &&
 		prev.resolveImagePath === next.resolveImagePath &&
-		prev.editorRef === next.editorRef
+		prev.editorRef === next.editorRef &&
+		prev.onInternalLinkClick === next.onInternalLinkClick
 	);
 }
 
@@ -106,6 +115,7 @@ function EditorComponent({
 	editorRef,
 	active,
 	onFrontmatterTrigger,
+	onInternalLinkClick,
 }: EditorComponentProps) {
 	const lastContentRef = React.useRef(content);
 	const onChangeRef = React.useRef(onChange);
@@ -123,9 +133,10 @@ function EditorComponent({
 		if (!pendingEditor) return;
 		// @ts-expect-error - markdown is added by the extension
 		const markdown = pendingEditor.storage.markdown.getMarkdown() as string;
-		if (markdown === lastContentRef.current) return;
-		lastContentRef.current = markdown;
-		onChangeRef.current(markdown);
+		const normalized = serializeInternalLinkMarkdown(markdown);
+		if (normalized === lastContentRef.current) return;
+		lastContentRef.current = normalized;
+		onChangeRef.current(normalized);
 	}, []);
 
 	const scheduleMarkdownSync = React.useCallback(
@@ -173,13 +184,34 @@ function EditorComponent({
 			}),
 			StarterKit.configure({
 				codeBlock: false,
+				link: false,
 			}),
+			Link.configure({
+				openOnClick: false,
+				protocols: ["internal-link", "internal-link-embed"],
+				isAllowedUri: (url, ctx) => {
+					const trimmed = url?.trim() ?? "";
+					// Allow our internal protocols
+					if (
+						trimmed.startsWith("internal-link:") ||
+						trimmed.startsWith("internal-link-embed:")
+					) {
+						return true;
+					}
+					// Block dangerous protocols
+					if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+						return false;
+					}
+					// Use default validation for everything else
+					return !!isAllowedUri(url, ctx.protocols);
+				},
+			}),
+			InternalLinkMarkdown,
 			CodeBlockCodeMirror,
 			ImageWithResolver.configure({
 				allowBase64: true,
 				resolveImagePath,
 			}),
-			Markdown,
 			Placeholder.configure({
 				placeholder: "Start writing...",
 			}),
@@ -189,6 +221,7 @@ function EditorComponent({
 				onImageUpload,
 			}),
 			TaskListInputRule,
+			Markdown,
 		],
 		content,
 		onUpdate: ({ editor, transaction }) => {
@@ -222,6 +255,24 @@ function EditorComponent({
 				class:
 					"prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none p-8 dark:prose-invert",
 				style: "font-size: var(--editor-font-size, 16px)",
+			},
+			handleClickOn(_view, _pos, _node, _nodePos, _event, direct) {
+				if (!direct) return false;
+				const event = _event as MouseEvent;
+				const target = event.target as HTMLElement;
+				const anchor = target.closest("a");
+				if (anchor) {
+					const href = anchor.getAttribute("href");
+					if (href) {
+						const parsed = parseInternalLinkHref(href);
+						if (parsed) {
+							event.preventDefault();
+							onInternalLinkClick?.(parsed.target);
+							return true;
+						}
+					}
+				}
+				return false;
 			},
 			handleDrop(view, event, _slice, moved) {
 				if (moved || !event.dataTransfer) return false;

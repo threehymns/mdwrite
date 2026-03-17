@@ -8,13 +8,20 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react";
 import { forceX, forceY } from "d3-force";
 import * as React from "react";
-import ForceGraph2D from "react-force-graph-2d";
+import { lazy, Suspense } from "react";
+
+const ForceGraph2D = lazy(() => import("react-force-graph-2d"));
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import type { FileNode } from "@/lib/fs";
 import { readFile } from "@/lib/fs";
+import {
+	parseInternalLinkBody,
+	stripInternalLinkAnchor,
+} from "@/lib/internal-links";
 import { extractTags, matchQuery, type Searchable } from "@/lib/search";
 
 interface GraphTabProps {
@@ -67,7 +74,7 @@ interface PanelState {
 	animationProgress: number;
 }
 
-const WIKILINK_RE = /\[\[([^\]|#]+)(?:#[^\]|]+)?(?:\|[^\]]+)?\]\]/g;
+const INTERNAL_LINK_RE = /!?\[\[([^\]]+)\]\]/g;
 const MD_LINK_RE = /\[[^\]]+\]\(([^)]+)\)/g;
 
 const DEFAULT_PANEL: PanelState = {
@@ -131,7 +138,7 @@ function flattenMarkdownFiles(nodes: FileNode[]): FileNode[] {
 	return result;
 }
 
-function resolveWikilink(
+function resolveInternalLink(
 	rawTarget: string,
 	currentPath: string,
 	pathByNoExt: Map<string, string>,
@@ -162,12 +169,23 @@ function resolveMarkdownLink(
 	currentPath: string,
 	pathByNoExt: Map<string, string>,
 ): string | null {
-	const target = rawTarget.trim();
+	let target = rawTarget.trim();
 	if (!target) return null;
+	if (target.startsWith("<") && target.endsWith(">")) {
+		target = target.slice(1, -1).trim();
+	}
+	if (
+		target.startsWith("internal-link:") ||
+		target.startsWith("internal-link-embed:")
+	) {
+		const schemeSplit = target.split(":", 2);
+		target = target.slice(schemeSplit[0].length + 1);
+	}
 	if (/^[a-z]+:/i.test(target)) return null;
 	if (target.startsWith("#")) return null;
 
-	const withoutHash = target.split("#")[0].split("?")[0];
+	const decoded = safeDecodeURIComponent(target);
+	const withoutHash = decoded.split("#")[0].split("?")[0];
 	if (!withoutHash) return null;
 
 	const absolute = withoutHash.startsWith("/")
@@ -178,6 +196,14 @@ function resolveMarkdownLink(
 	if (pathByNoExt.has(lowerNoExt)) return pathByNoExt.get(lowerNoExt) || null;
 
 	return null;
+}
+
+function safeDecodeURIComponent(value: string): string {
+	try {
+		return decodeURIComponent(value);
+	} catch {
+		return value;
+	}
 }
 
 function linearToSrgb(val: number): number {
@@ -637,18 +663,25 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
 						edgeSet.add(`${a}||${b}`);
 					};
 
-					WIKILINK_RE.lastIndex = 0;
-					let wikimatch = WIKILINK_RE.exec(content);
-					while (wikimatch !== null) {
-						const raw = wikimatch[1].trim();
-						const resolved = resolveWikilink(
-							raw,
+					INTERNAL_LINK_RE.lastIndex = 0;
+					let internalMatch = INTERNAL_LINK_RE.exec(content);
+					while (internalMatch !== null) {
+						const parsed = parseInternalLinkBody(internalMatch[1]);
+						const rawTarget = parsed
+							? stripInternalLinkAnchor(parsed.target)
+							: "";
+						if (!rawTarget) {
+							internalMatch = INTERNAL_LINK_RE.exec(content);
+							continue;
+						}
+						const resolved = resolveInternalLink(
+							rawTarget,
 							file.relativePath,
 							pathByNoExt,
 							pathsByBasename,
 						);
-						addEdge(resolved, raw);
-						wikimatch = WIKILINK_RE.exec(content);
+						addEdge(resolved, rawTarget);
+						internalMatch = INTERNAL_LINK_RE.exec(content);
 					}
 
 					MD_LINK_RE.lastIndex = 0;
@@ -999,185 +1032,210 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
 						</div>
 					)}
 
-					<ForceGraph2D
-						ref={graphRef}
-						width={graphSize.width}
-						height={graphSize.height}
-						graphData={graphData}
-						autoPauseRedraw={!isHoverAnimating}
-						backgroundColor="transparent"
-						nodeRelSize={10}
-						d3AlphaMin={0}
-						d3AlphaTarget={0.01}
-						linkDirectionalArrowLength={
-							panel.showArrows ? 9 * panel.linkThickness : 0
+					<Suspense
+						fallback={
+							<div className="absolute inset-0 z-30 flex items-center justify-center text-muted-foreground text-sm">
+								Loading graph...
+							</div>
 						}
-						linkDirectionalArrowRelPos={1}
-						linkDirectionalArrowColor={(link: any) => {
-							const sourceId =
-								typeof link.source === "object" ? link.source.id : link.source;
-							const targetId =
-								typeof link.target === "object" ? link.target.id : link.target;
-							const hoverStrength = Math.max(
-								hoverStrengthsRef.current.get(sourceId) ?? 0,
-								hoverStrengthsRef.current.get(targetId) ?? 0,
-							);
-							const baseColor = withAlpha(
-								palette.link,
-								mix(0.7, 0.35, focusStrengthRef.current),
-							);
-							return mixColors(
-								baseColor,
-								withAlpha(palette.primary, 0.92),
-								hoverStrength,
-							);
-						}}
-						linkWidth={(link: any) => {
-							const sourceId =
-								typeof link.source === "object" ? link.source.id : link.source;
-							const targetId =
-								typeof link.target === "object" ? link.target.id : link.target;
-							const base = panel.linkThickness * 0.9;
-							const hoverStrength = Math.max(
-								hoverStrengthsRef.current.get(sourceId) ?? 0,
-								hoverStrengthsRef.current.get(targetId) ?? 0,
-							);
-							const inactiveMultiplier = mix(1, 0.45, focusStrengthRef.current);
-							return base * mix(inactiveMultiplier, 1.8, hoverStrength);
-						}}
-						linkColor={(link: any) => {
-							const sourceId =
-								typeof link.source === "object" ? link.source.id : link.source;
-							const targetId =
-								typeof link.target === "object" ? link.target.id : link.target;
-							const hoverStrength = Math.max(
-								hoverStrengthsRef.current.get(sourceId) ?? 0,
-								hoverStrengthsRef.current.get(targetId) ?? 0,
-							);
-							const baseColor = withAlpha(
-								palette.link,
-								mix(0.7, 0.35, focusStrengthRef.current),
-							);
-							return mixColors(
-								baseColor,
-								withAlpha(palette.chart1, 0.4),
-								hoverStrength,
-							);
-						}}
-						nodeCanvasObject={(
-							node: any,
-							ctx: CanvasRenderingContext2D,
-							globalScale: number,
-						) => {
-							const data = node as GraphNode;
-							const isHovered = hoveredNodeId === data.id;
-							const hoverStrength = hoverStrengthsRef.current.get(data.id) ?? 0;
-							const focusStrength = focusStrengthRef.current;
-							const radius =
-								(data.ghost
-									? 2.8
-									: Math.min(10, 3.6 + Math.sqrt(Math.max(1, data.degree)))) *
-								panel.nodeSize;
-
-							const matchedGroup = panel.groups.find((g) => {
-								const q = g.query.trim();
-								return q && matchQuery(q, data);
-							});
-							const baseNodeColor = matchedGroup
-								? mixColors(palette.muted, matchedGroup.color, 0.35)
-								: palette.muted;
-							const drawRadius = radius + 1.4 * hoverStrength;
-
-							ctx.beginPath();
-							ctx.arc(node.x, node.y, drawRadius, 0, 2 * Math.PI, false);
-							ctx.fillStyle = mixColors(
-								baseNodeColor,
-								palette.primary,
-								hoverStrength,
-							);
-							ctx.globalAlpha = data.ghost
-								? mix(mix(0.42, 0.18, focusStrength), 0.72, hoverStrength)
-								: mix(mix(0.82, 0.48, focusStrength), 0.98, hoverStrength);
-							ctx.fill();
-							ctx.globalAlpha = 1;
-
-							ctx.lineWidth = mix(1.05, 1.8, hoverStrength);
-							ctx.strokeStyle = mixColors(
-								withAlpha(palette.background, mix(0.92, 0.65, focusStrength)),
-								withAlpha(palette.ring, 1),
-								hoverStrength,
-							);
-							ctx.stroke();
-
-							const zoomFade = smoothstep(
-								panel.textFadeThreshold * 0.74,
-								panel.textFadeThreshold * 1.08,
-								globalScale,
-							);
-							const labelFade =
-								data.degree >= 2
-									? Math.max(zoomFade, hoverStrength * 0.9)
-									: hoverStrength;
-							if (labelFade > 0.02) {
-								const fontSize =
-									(12 / globalScale) * getLabelZoomScale(globalScale);
-								const labelOffset =
-									5 / globalScale + (3 / globalScale) * hoverStrength;
-								const labelColor = isHovered
-									? palette.foreground
-									: mixColors(
-											withAlpha(
-												palette.foreground,
-												mix(0.86, 0.58, focusStrength),
-											),
-											withAlpha(palette.primary, 0.96),
-											hoverStrength * 0.7,
-										);
-
-								ctx.save();
-								ctx.font = `${fontSize}px sans-serif`;
-								ctx.textAlign = "center";
-								ctx.textBaseline = "top";
-								ctx.fillStyle = labelColor;
-								ctx.globalAlpha = isHovered
-									? 1
-									: Math.min(
-											0.98,
-											labelFade *
-												(data.ghost
-													? mix(
-															mix(0.58, 0.4, focusStrength),
-															0.86,
-															hoverStrength,
-														)
-													: mix(
-															mix(0.88, 0.52, focusStrength),
-															0.98,
-															hoverStrength,
-														)),
-										);
-								ctx.fillText(
-									data.label,
-									node.x,
-									node.y + drawRadius + labelOffset,
-								);
-								ctx.restore();
+					>
+						<ForceGraph2D
+							ref={graphRef}
+							width={graphSize.width}
+							height={graphSize.height}
+							graphData={graphData}
+							autoPauseRedraw={!isHoverAnimating}
+							backgroundColor="transparent"
+							nodeRelSize={10}
+							d3AlphaMin={0}
+							d3AlphaTarget={0.01}
+							linkDirectionalArrowLength={
+								panel.showArrows ? 9 * panel.linkThickness : 0
 							}
-						}}
-						onNodeHover={(node: any) => setHoveredNodeId(node?.id ?? null)}
-						onNodeClick={(node: any) => {
-							const data = node as GraphNode;
-							if (data.path) onOpenFilePath(data.path);
-						}}
-						onNodeRightClick={(node: any, event: MouseEvent) => {
-							event.preventDefault();
-							setContextMenu({
-								x: event.clientX,
-								y: event.clientY,
-								nodeId: node?.id ?? null,
-							});
-						}}
-					/>
+							linkDirectionalArrowRelPos={1}
+							linkDirectionalArrowColor={(link: any) => {
+								const sourceId =
+									typeof link.source === "object"
+										? link.source.id
+										: link.source;
+								const targetId =
+									typeof link.target === "object"
+										? link.target.id
+										: link.target;
+								const hoverStrength = Math.max(
+									hoverStrengthsRef.current.get(sourceId) ?? 0,
+									hoverStrengthsRef.current.get(targetId) ?? 0,
+								);
+								const baseColor = withAlpha(
+									palette.link,
+									mix(0.7, 0.35, focusStrengthRef.current),
+								);
+								return mixColors(
+									baseColor,
+									withAlpha(palette.primary, 0.92),
+									hoverStrength,
+								);
+							}}
+							linkWidth={(link: any) => {
+								const sourceId =
+									typeof link.source === "object"
+										? link.source.id
+										: link.source;
+								const targetId =
+									typeof link.target === "object"
+										? link.target.id
+										: link.target;
+								const base = panel.linkThickness * 0.9;
+								const hoverStrength = Math.max(
+									hoverStrengthsRef.current.get(sourceId) ?? 0,
+									hoverStrengthsRef.current.get(targetId) ?? 0,
+								);
+								const inactiveMultiplier = mix(
+									1,
+									0.45,
+									focusStrengthRef.current,
+								);
+								return base * mix(inactiveMultiplier, 1.8, hoverStrength);
+							}}
+							linkColor={(link: any) => {
+								const sourceId =
+									typeof link.source === "object"
+										? link.source.id
+										: link.source;
+								const targetId =
+									typeof link.target === "object"
+										? link.target.id
+										: link.target;
+								const hoverStrength = Math.max(
+									hoverStrengthsRef.current.get(sourceId) ?? 0,
+									hoverStrengthsRef.current.get(targetId) ?? 0,
+								);
+								const baseColor = withAlpha(
+									palette.link,
+									mix(0.7, 0.35, focusStrengthRef.current),
+								);
+								return mixColors(
+									baseColor,
+									withAlpha(palette.chart1, 0.4),
+									hoverStrength,
+								);
+							}}
+							nodeCanvasObject={(
+								node: any,
+								ctx: CanvasRenderingContext2D,
+								globalScale: number,
+							) => {
+								const data = node as GraphNode;
+								const isHovered = hoveredNodeId === data.id;
+								const hoverStrength =
+									hoverStrengthsRef.current.get(data.id) ?? 0;
+								const focusStrength = focusStrengthRef.current;
+								const radius =
+									(data.ghost
+										? 2.8
+										: Math.min(10, 3.6 + Math.sqrt(Math.max(1, data.degree)))) *
+									panel.nodeSize;
+
+								const matchedGroup = panel.groups.find((g) => {
+									const q = g.query.trim();
+									return q && matchQuery(q, data);
+								});
+								const baseNodeColor = matchedGroup
+									? mixColors(palette.muted, matchedGroup.color, 0.35)
+									: palette.muted;
+								const drawRadius = radius + 1.4 * hoverStrength;
+
+								ctx.beginPath();
+								ctx.arc(node.x, node.y, drawRadius, 0, 2 * Math.PI, false);
+								ctx.fillStyle = mixColors(
+									baseNodeColor,
+									palette.primary,
+									hoverStrength,
+								);
+								ctx.globalAlpha = data.ghost
+									? mix(mix(0.42, 0.18, focusStrength), 0.72, hoverStrength)
+									: mix(mix(0.82, 0.48, focusStrength), 0.98, hoverStrength);
+								ctx.fill();
+								ctx.globalAlpha = 1;
+
+								ctx.lineWidth = mix(1.05, 1.8, hoverStrength);
+								ctx.strokeStyle = mixColors(
+									withAlpha(palette.background, mix(0.92, 0.65, focusStrength)),
+									withAlpha(palette.ring, 1),
+									hoverStrength,
+								);
+								ctx.stroke();
+
+								const zoomFade = smoothstep(
+									panel.textFadeThreshold * 0.74,
+									panel.textFadeThreshold * 1.08,
+									globalScale,
+								);
+								const labelFade =
+									data.degree >= 2
+										? Math.max(zoomFade, hoverStrength * 0.9)
+										: hoverStrength;
+								if (labelFade > 0.02) {
+									const fontSize =
+										(12 / globalScale) * getLabelZoomScale(globalScale);
+									const labelOffset =
+										5 / globalScale + (3 / globalScale) * hoverStrength;
+									const labelColor = isHovered
+										? palette.foreground
+										: mixColors(
+												withAlpha(
+													palette.foreground,
+													mix(0.86, 0.58, focusStrength),
+												),
+												withAlpha(palette.primary, 0.96),
+												hoverStrength * 0.7,
+											);
+
+									ctx.save();
+									ctx.font = `${fontSize}px sans-serif`;
+									ctx.textAlign = "center";
+									ctx.textBaseline = "top";
+									ctx.fillStyle = labelColor;
+									ctx.globalAlpha = isHovered
+										? 1
+										: Math.min(
+												0.98,
+												labelFade *
+													(data.ghost
+														? mix(
+																mix(0.58, 0.4, focusStrength),
+																0.86,
+																hoverStrength,
+															)
+														: mix(
+																mix(0.88, 0.52, focusStrength),
+																0.98,
+																hoverStrength,
+															)),
+											);
+									ctx.fillText(
+										data.label,
+										node.x,
+										node.y + drawRadius + labelOffset,
+									);
+									ctx.restore();
+								}
+							}}
+							onNodeHover={(node: any) => setHoveredNodeId(node?.id ?? null)}
+							onNodeClick={(node: any) => {
+								const data = node as GraphNode;
+								if (data.path) onOpenFilePath(data.path);
+							}}
+							onNodeRightClick={(node: any, event: MouseEvent) => {
+								event.preventDefault();
+								setContextMenu({
+									x: event.clientX,
+									y: event.clientY,
+									nodeId: node?.id ?? null,
+								});
+							}}
+						/>
+					</Suspense>
 				</div>
 
 				{contextMenu && (

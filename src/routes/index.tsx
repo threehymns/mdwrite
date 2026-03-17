@@ -37,7 +37,12 @@ import {
 	saveRecentFolder,
 	writeFile,
 } from "@/lib/fs";
-import { type Frontmatter, parseFrontmatter, serializeFrontmatter } from "@/lib/markdown";
+import { parseInternalLinkMarkdown } from "@/lib/internal-links";
+import {
+	type Frontmatter,
+	parseFrontmatter,
+	serializeFrontmatter,
+} from "@/lib/markdown";
 import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/")({ component: App });
@@ -57,6 +62,25 @@ function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
 		}
 	}
 	return null;
+}
+
+function getDirectory(path: string): string {
+	const lastSlash = path.lastIndexOf("/");
+	return lastSlash === -1 ? "" : path.slice(0, lastSlash);
+}
+
+function normalizePath(path: string): string {
+	const parts = path.split("/").filter(Boolean);
+	const result: string[] = [];
+	for (const part of parts) {
+		if (part === ".") continue;
+		if (part === "..") {
+			result.pop();
+		} else {
+			result.push(part);
+		}
+	}
+	return result.join("/");
 }
 
 function createGraphTabNode(handle: FileSystemHandle): FileNode {
@@ -326,7 +350,10 @@ function App() {
 					} = parseFrontmatter(text);
 					const props = hasFrontmatter ? frontmatterToProperties(fm) : [];
 					setProperties(props);
-					setContentImmediate(hasFrontmatter ? body : text);
+					const processed = parseInternalLinkMarkdown(
+						hasFrontmatter ? body : text,
+					);
+					setContentImmediate(processed);
 				}
 			}
 		},
@@ -341,6 +368,95 @@ function App() {
 		},
 		[files, handleFileSelect],
 	);
+
+	const pendingAnchorRef = React.useRef<string | null>(null);
+
+	const handleInternalLinkClick = React.useCallback(
+		(target: string) => {
+			let resolvedTarget = target.trim();
+			if (resolvedTarget.startsWith("<") && resolvedTarget.endsWith(">")) {
+				resolvedTarget = resolvedTarget.slice(1, -1).trim();
+			}
+			if (
+				resolvedTarget.startsWith("internal-link:") ||
+				resolvedTarget.startsWith("internal-link-embed:")
+			) {
+				const schemeSplit = resolvedTarget.split(":", 2);
+				resolvedTarget = resolvedTarget.slice(schemeSplit[0].length + 1);
+			}
+			if (/^[a-z]+:/i.test(resolvedTarget)) return;
+			if (resolvedTarget.startsWith("#")) {
+				const heading = resolvedTarget.slice(1);
+				if (editorRef.current && heading) {
+					const headingMatch = headings.find(
+						(h) => h.text.toLowerCase() === heading.toLowerCase(),
+					);
+					if (headingMatch) {
+						editorRef.current.scrollToHeading(
+							headingMatch.text,
+							headingMatch.level,
+						);
+					}
+				}
+				return;
+			}
+
+			const decoded = (() => {
+				try {
+					return decodeURIComponent(resolvedTarget);
+				} catch {
+					return resolvedTarget;
+				}
+			})();
+
+			const [pathPart] = decoded.split("#");
+			const anchor = decoded.includes("#") ? decoded.split("#")[1] : null;
+
+			const currentDir = activePath ? getDirectory(activePath) : "";
+			const absolute = pathPart.startsWith("/")
+				? normalizePath(pathPart.slice(1))
+				: normalizePath(`${currentDir}/${pathPart}`);
+
+			const fileNode = findNodeByPath(files, absolute);
+			if (!fileNode || fileNode.kind !== "file") return;
+
+			const isCurrentFile = fileNode.relativePath === activePath;
+			if (isCurrentFile && anchor && editorRef.current) {
+				const headingMatch = headings.find(
+					(h) => h.text.toLowerCase() === anchor.toLowerCase(),
+				);
+				if (headingMatch) {
+					editorRef.current.scrollToHeading(
+						headingMatch.text,
+						headingMatch.level,
+					);
+				}
+				return;
+			}
+
+			pendingAnchorRef.current = anchor;
+			void handleFileSelect(fileNode);
+		},
+		[files, handleFileSelect, activePath, headings],
+	);
+
+	React.useEffect(() => {
+		const anchor = pendingAnchorRef.current;
+		if (!anchor || !editorRef.current) return;
+
+		const headingMatch = headings.find(
+			(h) => h.text.toLowerCase() === anchor.toLowerCase(),
+		);
+		if (headingMatch) {
+			setTimeout(() => {
+				editorRef.current?.scrollToHeading(
+					headingMatch.text,
+					headingMatch.level,
+				);
+			}, 100);
+		}
+		pendingAnchorRef.current = null;
+	}, [activePath, headings]);
 
 	const handleTabClose = (path: string) => {
 		setTabs((prev) => {
@@ -843,7 +959,10 @@ function App() {
 										? frontmatterToProperties(fm)
 										: [];
 									setProperties(props);
-									setContentImmediate(hasFrontmatter ? body : text);
+									const processed = parseInternalLinkMarkdown(
+										hasFrontmatter ? body : text,
+									);
+									setContentImmediate(processed);
 								}
 							}
 						}
@@ -883,7 +1002,10 @@ function App() {
 							? frontmatterToProperties(fm, properties)
 							: [];
 						setProperties(props);
-						setContentImmediate(hasFrontmatter ? body : text);
+						const processed = parseInternalLinkMarkdown(
+							hasFrontmatter ? body : text,
+						);
+						setContentImmediate(processed);
 						lastModifiedRef.current = file.lastModified;
 					}
 				}
@@ -1096,6 +1218,7 @@ function App() {
 											onFrontmatterTrigger={() => {
 												setProperties([{ key: "", type: "text", value: "" }]);
 											}}
+											onInternalLinkClick={handleInternalLinkClick}
 										/>
 									</div>
 								</React.Activity>
