@@ -176,6 +176,9 @@ function EditorComponent({
 		};
 	}, [flushPendingMarkdown]);
 
+	// State to force re-render on selection change
+	const [, setSelectionKey] = React.useState(0);
+
 	const editor = useEditor({
 		extensions: [
 			TaskList,
@@ -249,6 +252,10 @@ function EditorComponent({
 		},
 		onBlur: () => {
 			flushMarkdownSyncNow();
+		},
+		onSelectionUpdate: () => {
+			// Force re-render when selection changes to update word count display
+			setSelectionKey((k) => k + 1);
 		},
 		editorProps: {
 			attributes: {
@@ -398,6 +405,21 @@ function EditorComponent({
 		}
 	}, [content, editor, active]);
 
+	// Calculate word count for a given text
+	const countWords = (text: string) => {
+		const trimmed = text.trim();
+		return trimmed ? trimmed.split(/\s+/).length : 0;
+	};
+
+	// Get selection info for display
+	const selection = editor?.state.selection;
+	const hasSelection = selection && selection.from !== selection.to;
+	const selectedText = hasSelection
+		? editor?.state.doc.textBetween(selection.from, selection.to, " ") || ""
+		: "";
+	const selectedWordCount = hasSelection ? countWords(selectedText) : 0;
+	const selectedCharCount = hasSelection ? selectedText.length : 0;
+
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden bg-background text-foreground">
 			<div className="flex-1 overflow-auto">
@@ -405,8 +427,16 @@ function EditorComponent({
 			</div>
 			<div className="flex h-8 shrink-0 items-center justify-between border-t bg-secondary/10 px-4 text-muted-foreground text-xs">
 				<div className="flex gap-4">
-					<span>{editor?.storage.characterCount.words()} words</span>
-					<span>{editor?.storage.characterCount.characters()} characters</span>
+					<span>
+						{hasSelection
+							? `${selectedWordCount} selected`
+							: `${editor?.storage.characterCount.words()} words`}
+					</span>
+					<span>
+						{hasSelection
+							? `${selectedCharCount} selected`
+							: `${editor?.storage.characterCount.characters()} characters`}
+					</span>
 				</div>
 				<div>Markdown</div>
 			</div>
