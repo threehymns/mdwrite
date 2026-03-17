@@ -2,10 +2,14 @@
 	"name": "mdwrite",
 	"private": true,
 	"type": "module",
+	"main": "electron/main.cjs",
 	"scripts": {
 		"dev": "vite dev --port 3000",
 		"build": "vite build",
 		"preview": "vite preview",
+		"dev:desktop": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"vite dev --port 3000\" \"wait-on http://localhost:3000 && cross-env VITE_DEV_SERVER_URL=http://localhost:3000 electron .\"",
+		"build:desktop": "vite build && electron-builder",
+		"pack:desktop": "vite build && electron-builder --dir",
 		"test": "vitest run",
 		"lint": "eslint",
 		"format": "prettier",
@@ -79,11 +83,43 @@
 		"@types/react-dom": "^19.2.0",
 		"@types/wicg-file-system-access": "^2023.10.7",
 		"@vitejs/plugin-react": "^5.0.4",
+		"concurrently": "^9.2.1",
+		"cross-env": "^10.1.0",
+		"electron": "^41.0.0",
+		"electron-builder": "^26.8.1",
 		"jsdom": "^27.0.0",
 		"prettier": "^3.5.3",
 		"typescript": "^5.7.2",
 		"vite": "^7.1.7",
 		"vitest": "^3.0.5",
+		"wait-on": "^9.0.4",
 		"web-vitals": "^5.1.0"
+	},
+	"build": {
+		"appId": "com.mdwrite.app",
+		"productName": "MDWrite",
+		"files": [
+			"electron/**",
+			"package.json"
+		],
+		"extraResources": [
+			{
+				"from": ".output",
+				"to": ".output"
+			}
+		],
+		"mac": {
+			"category": "public.app-category.productivity"
+		},
+		"win": {
+			"target": [
+				"nsis"
+			]
+		},
+		"linux": {
+			"target": [
+				"AppImage"
+			]
+		}
 	}
 }
