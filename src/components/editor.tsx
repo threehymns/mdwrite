@@ -253,7 +253,7 @@ function EditorComponent({
 		editorProps: {
 			attributes: {
 				class:
-					"prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none p-8 dark:prose-invert",
+					"prose !prose-shadcn prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none p-8 dark:prose-invert",
 				style: "font-size: var(--editor-font-size, 16px)",
 			},
 			handleClickOn(_view, _pos, _node, _nodePos, _event, direct) {
