@@ -1,6 +1,13 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+
 interface Heading {
 	level: number;
 	text: string;
@@ -44,49 +51,74 @@ export function TableOfContents({
 					const isActive = activeHeadingIndex === heading.index;
 
 					return (
-						<button
-							key={`${heading.index}-${heading.text}`}
-							type="button"
-							onClick={() => onHeadingClick(heading.index)}
-							className={cn(
-								"group relative flex w-full items-center rounded-md transition-all",
-								isExpanded
-									? "px-2 py-1 hover:bg-secondary"
-									: "h-0.5 justify-end px-0 py-1",
-							)}
-						>
-							{isExpanded ? (
-								<div className="flex w-full items-center gap-2 overflow-hidden">
-									<span className="text-[10px] text-muted-foreground/40">
-										{"#".repeat(heading.level)}
-									</span>
-									<span
-										className={cn(
-											"truncate text-left text-xs transition-colors",
-											isActive
-												? "font-medium text-primary"
-												: "text-muted-foreground group-hover:text-foreground",
-										)}
-										style={{ marginLeft: `${(heading.level - 1) * 8}px` }}
-									>
-										{heading.text}
-									</span>
-								</div>
-							) : (
-								<div
+						<ContextMenu key={`${heading.index}-${heading.text}`}>
+							<ContextMenuTrigger asChild>
+								<button
+									type="button"
+									onClick={() => onHeadingClick(heading.index)}
 									className={cn(
-										"h-0.5 max-w-8 rounded-full bg-muted-foreground/30 transition-all group-hover:bg-foreground",
-										isActive && "w-5 bg-primary",
-										!isActive &&
-											(heading.level === 1
-												? "w-4"
-												: heading.level === 2
-													? "w-3"
-													: "w-2"),
+										"group relative flex w-full items-center rounded-md transition-all",
+										isExpanded
+											? "px-2 py-1 hover:bg-secondary"
+											: "h-0.5 justify-end px-0 py-1",
 									)}
-								/>
-							)}
-						</button>
+								>
+									{isExpanded ? (
+										<div className="flex w-full items-center gap-2 overflow-hidden">
+											<span className="text-[10px] text-muted-foreground/40">
+												{"#".repeat(heading.level)}
+											</span>
+											<span
+												className={cn(
+													"truncate text-left text-xs transition-colors",
+													isActive
+														? "font-medium text-primary"
+														: "text-muted-foreground group-hover:text-foreground",
+												)}
+												style={{ marginLeft: `${(heading.level - 1) * 8}px` }}
+											>
+												{heading.text}
+											</span>
+										</div>
+									) : (
+										<div
+											className={cn(
+												"h-0.5 max-w-8 rounded-full bg-muted-foreground/30 transition-all group-hover:bg-foreground",
+												isActive && "w-5 bg-primary",
+												!isActive &&
+													(heading.level === 1
+														? "w-4"
+														: heading.level === 2
+															? "w-3"
+															: "w-2"),
+											)}
+										/>
+									)}
+								</button>
+							</ContextMenuTrigger>
+							<ContextMenuContent>
+								<ContextMenuItem
+									onClick={() => onHeadingClick(heading.index)}
+								>
+									<span>Go to heading</span>
+								</ContextMenuItem>
+								<ContextMenuItem
+									onClick={() => {
+										navigator.clipboard.writeText(heading.text);
+									}}
+								>
+									<span>Copy heading text</span>
+								</ContextMenuItem>
+								<ContextMenuItem
+									onClick={() => {
+										const markdown = "#".repeat(heading.level) + " ";
+										navigator.clipboard.writeText(markdown + heading.text);
+									}}
+								>
+									<span>Copy as markdown</span>
+								</ContextMenuItem>
+							</ContextMenuContent>
+						</ContextMenu>
 					);
 				})}
 			</div>

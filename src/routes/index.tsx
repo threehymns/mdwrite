@@ -50,6 +50,7 @@ export const Route = createFileRoute("/")({ component: App });
 const TABS_STORAGE_KEY = "mdwrite-tabs";
 const ACTIVE_PATH_STORAGE_KEY = "mdwrite-active-path";
 const SIDEBAR_OPEN_STORAGE_KEY = "mdwrite-sidebar-open";
+const SIDEBAR_EXPANDED_PATHS_KEY = "mdwrite-sidebar-expanded-paths";
 const CONTENT_STATE_SYNC_DELAY_MS = 180;
 const GRAPH_TAB_PATH = "__graph_view__";
 
@@ -99,6 +100,19 @@ function App() {
 			return saved !== null ? saved === "true" : true;
 		}
 		return false;
+	});
+	const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(() => {
+		if (typeof window !== "undefined") {
+			const saved = localStorage.getItem(SIDEBAR_EXPANDED_PATHS_KEY);
+			if (saved) {
+				try {
+					return new Set(JSON.parse(saved));
+				} catch {
+					return new Set();
+				}
+			}
+		}
+		return new Set();
 	});
 	const [isSearchOpen, setIsSearchOpen] = React.useState(false);
 	const [isCommandBarOpen, setIsCommandBarOpen] = React.useState(false);
@@ -291,6 +305,61 @@ function App() {
 				setRootHandle(storedHandle);
 				await refreshFiles(storedHandle);
 				setIsSidebarOpen(true);
+
+				// Restore tabs from localStorage
+				const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
+				const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
+				const showHiddenFilesOnInit = localStorage.getItem("showHiddenFiles") === "true";
+
+				if (savedTabs) {
+					try {
+						const tree = await getFileTree(storedHandle, "", showHiddenFilesOnInit);
+						const paths = JSON.parse(savedTabs) as string[];
+						const restoredTabs: FileNode[] = [];
+						for (const path of paths) {
+							if (path === GRAPH_TAB_PATH) {
+								restoredTabs.push(createGraphTabNode(storedHandle));
+								continue;
+							}
+							const node = findNodeByPath(tree, path);
+							if (node) restoredTabs.push(node);
+						}
+						setTabs(restoredTabs);
+
+						if (savedActive) {
+							const activeNode = restoredTabs.find(
+								(t) => t.relativePath === savedActive,
+							);
+							if (activeNode) {
+								setActivePath(activeNode.relativePath);
+								if (activeNode.relativePath === GRAPH_TAB_PATH) {
+									setContentImmediate("");
+									setProperties([]);
+								} else {
+									const { content: text, lastModified } = await readFile(
+										activeNode.handle as FileSystemFileHandle,
+									);
+									lastModifiedRef.current = lastModified;
+									const {
+										frontmatter: fm,
+										hasFrontmatter,
+										body,
+									} = parseFrontmatter(text);
+									const props = hasFrontmatter
+										? frontmatterToProperties(fm)
+										: [];
+									setProperties(props);
+									const processed = parseInternalLinkMarkdown(
+										hasFrontmatter ? body : text,
+									);
+									setContentImmediate(processed);
+								}
+							}
+						}
+					} catch (e) {
+						console.error("Failed to restore tabs", e);
+					}
+				}
 			}
 		}
 	};
@@ -472,6 +541,29 @@ function App() {
 			}
 			return newTabs;
 		});
+	};
+
+	const handleTabsCloseOther = (keepPath: string) => {
+		setTabs((prev) => {
+			const keepTab = prev.find((t) => t.relativePath === keepPath);
+			if (!keepTab) return prev;
+			setActivePath(keepPath);
+			handleFileSelect(keepTab);
+			return [keepTab];
+		});
+	};
+
+	const handleTabsCloseToRight = (fromPath: string) => {
+		setTabs((prev) => {
+			const fromIndex = prev.findIndex((t) => t.relativePath === fromPath);
+			if (fromIndex === -1) return prev;
+			const newTabs = prev.slice(0, fromIndex + 1);
+			return newTabs;
+		});
+	};
+
+	const handleCopyFilePath = (path: string) => {
+		navigator.clipboard.writeText(path);
 	};
 
 	const handleDeleteFile = React.useCallback(
@@ -842,6 +934,18 @@ function App() {
 		],
 	);
 
+	const handleDirectoryToggle = React.useCallback((path: string, isExpanded: boolean) => {
+		setExpandedPaths((prev) => {
+			const next = new Set(prev);
+			if (isExpanded) {
+				next.add(path);
+			} else {
+				next.delete(path);
+			}
+			return next;
+		});
+	}, []);
+
 	React.useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const checkShortcut = (actionId: string) => {
@@ -890,6 +994,13 @@ function App() {
 	React.useEffect(() => {
 		localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(isSidebarOpen));
 	}, [isSidebarOpen]);
+
+	React.useEffect(() => {
+		localStorage.setItem(
+			SIDEBAR_EXPANDED_PATHS_KEY,
+			JSON.stringify([...expandedPaths]),
+		);
+	}, [expandedPaths]);
 
 	React.useEffect(() => {
 		localStorage.setItem(
@@ -1091,6 +1202,8 @@ function App() {
 					onCreateNote={handleCreateNote}
 					activePath={activePath}
 					onSearchOpen={handleSearchOpen}
+					expandedPaths={expandedPaths}
+					onDirectoryToggle={handleDirectoryToggle}
 				/>
 			)}
 			<main className="flex min-w-0 flex-1 flex-col bg-background">
@@ -1099,7 +1212,10 @@ function App() {
 					activePath={activePath}
 					onTabSelect={handleFileSelect}
 					onTabClose={handleTabClose}
+					onTabsCloseOther={handleTabsCloseOther}
+					onTabsCloseToRight={handleTabsCloseToRight}
 					onTabsReorder={setTabs}
+					onCopyFilePath={handleCopyFilePath}
 					left={
 						<Button
 							variant="ghost"

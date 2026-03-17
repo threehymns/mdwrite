@@ -10,6 +10,7 @@ import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
 import * as React from "react";
 import { Markdown } from "tiptap-markdown";
 import {
@@ -20,6 +21,10 @@ import { CodeBlockCodeMirror } from "./editor/extensions/code-block-codemirror";
 import { ImageWithResolver } from "./editor/extensions/image-with-resolver";
 import { InternalLinkMarkdown } from "./editor/extensions/internal-link-markdown";
 import { SlashCommand, suggestion } from "./editor/extensions/slash-command";
+import {
+	EditorContextMenu,
+	type EditorContextMenuState,
+} from "./editor/editor-context-menu";
 
 const TaskListInputRule = Extension.create({
 	name: "taskListInputRule",
@@ -71,6 +76,7 @@ interface EditorProps {
 	active?: boolean;
 	onFrontmatterTrigger?: () => void;
 	onInternalLinkClick?: (target: string) => void;
+	onContextMenuStateChange?: (state: EditorContextMenuState) => void;
 }
 
 export interface EditorHandle {
@@ -116,6 +122,7 @@ function EditorComponent({
 	active,
 	onFrontmatterTrigger,
 	onInternalLinkClick,
+	onContextMenuStateChange,
 }: EditorComponentProps) {
 	const lastContentRef = React.useRef(content);
 	const onChangeRef = React.useRef(onChange);
@@ -123,6 +130,13 @@ function EditorComponent({
 	const onFrontmatterTriggerRef = React.useRef(onFrontmatterTrigger);
 	const markdownSyncTimeoutRef = React.useRef<number | null>(null);
 	const pendingMarkdownEditorRef = React.useRef<TiptapEditor | null>(null);
+	const [contextMenuState, setContextMenuState] =
+		React.useState<EditorContextMenuState>({
+			isOpen: false,
+			x: 0,
+			y: 0,
+			type: "editor",
+		});
 
 	React.useEffect(() => {
 		onFrontmatterTriggerRef.current = onFrontmatterTrigger;
@@ -189,6 +203,7 @@ function EditorComponent({
 				codeBlock: false,
 				link: false,
 			}),
+			Underline,
 			Link.configure({
 				openOnClick: false,
 				protocols: ["internal-link", "internal-link-embed"],
@@ -364,6 +379,56 @@ function EditorComponent({
 
 				return false;
 			},
+			handleContextMenu(_view, event) {
+				const domEvent = event as unknown as MouseEvent;
+				const target = domEvent.target as HTMLElement;
+
+				// Check if clicking on a link
+				const anchor = target.closest("a");
+				if (anchor) {
+					const href = anchor.getAttribute("href");
+					if (href) {
+						const state: EditorContextMenuState = {
+							isOpen: true,
+							x: domEvent.clientX,
+							y: domEvent.clientY,
+							type: "link",
+							linkUrl: href,
+						};
+						setContextMenuState(state);
+						onContextMenuStateChange?.(state);
+						return;
+					}
+				}
+
+				// Check if clicking on an image
+				const image = target.closest("img");
+				if (image) {
+					const src = image.getAttribute("src");
+					if (src) {
+						const state: EditorContextMenuState = {
+							isOpen: true,
+							x: domEvent.clientX,
+							y: domEvent.clientY,
+							type: "image",
+							imageSrc: src,
+						};
+						setContextMenuState(state);
+						onContextMenuStateChange?.(state);
+						return;
+					}
+				}
+
+				// Default to editor context menu
+				const state: EditorContextMenuState = {
+					isOpen: true,
+					x: domEvent.clientX,
+					y: domEvent.clientY,
+					type: "editor",
+				};
+				setContextMenuState(state);
+				onContextMenuStateChange?.(state);
+			},
 		},
 	});
 
@@ -420,11 +485,148 @@ function EditorComponent({
 	const selectedWordCount = hasSelection ? countWords(selectedText) : 0;
 	const selectedCharCount = hasSelection ? selectedText.length : 0;
 
+	// Context menu formatting handlers
+	const handleBold = React.useCallback(() => {
+		editor?.chain().focus().toggleBold().run();
+	}, [editor]);
+
+	const handleItalic = React.useCallback(() => {
+		editor?.chain().focus().toggleItalic().run();
+	}, [editor]);
+
+	const handleUnderline = React.useCallback(() => {
+		editor?.chain().focus().toggleUnderline().run();
+	}, [editor]);
+
+	const handleStrike = React.useCallback(() => {
+		editor?.chain().focus().toggleStrike().run();
+	}, [editor]);
+
+	const handleCode = React.useCallback(() => {
+		editor?.chain().focus().toggleCode().run();
+	}, [editor]);
+
+	const handleHeading = React.useCallback(
+		(level: 1 | 2 | 3 | 4 | 5 | 6) => {
+			editor?.chain().focus().toggleHeading({ level }).run();
+		},
+		[editor],
+	);
+
+	const handleBulletList = React.useCallback(() => {
+		editor?.chain().focus().toggleBulletList().run();
+	}, [editor]);
+
+	const handleOrderedList = React.useCallback(() => {
+		editor?.chain().focus().toggleOrderedList().run();
+	}, [editor]);
+
+	const handleTaskList = React.useCallback(() => {
+		editor?.chain().focus().toggleTaskList().run();
+	}, [editor]);
+
+	const handleBlockquote = React.useCallback(() => {
+		editor?.chain().focus().toggleBlockquote().run();
+	}, [editor]);
+
+	const handleCodeBlock = React.useCallback(() => {
+		editor?.chain().focus().toggleCodeBlock().run();
+	}, [editor]);
+
+	const handleParagraph = React.useCallback(() => {
+		editor?.chain().focus().setParagraph().run();
+	}, [editor]);
+
+	const handleLinkOpen = React.useCallback(
+		(url: string) => {
+			// Check if it's an internal link
+			const parsed = parseInternalLinkHref(url);
+			if (parsed) {
+				onInternalLinkClick?.(parsed.target);
+			} else {
+				window.open(url, "_blank");
+			}
+		},
+		[onInternalLinkClick],
+	);
+
+	const handleLinkCopy = React.useCallback((url: string) => {
+		navigator.clipboard.writeText(url);
+	}, []);
+
+	const handleLinkEdit = React.useCallback(
+		(url: string) => {
+			editor?.chain().focus().setLink({ href: url }).run();
+		},
+		[editor],
+	);
+
+	const handleImageCopy = React.useCallback((src: string) => {
+		// Try to copy the image as a blob
+		fetch(src)
+			.then((res) => res.blob())
+			.then((blob) => {
+				try {
+					navigator.clipboard.write([
+						new ClipboardItem({ [blob.type]: blob }),
+					]);
+				} catch {
+					// Fallback to copying the URL
+					navigator.clipboard.writeText(src);
+				}
+			})
+			.catch(() => {
+				// Fallback to copying the URL
+				navigator.clipboard.writeText(src);
+			});
+	}, []);
+
+	const handleImageSaveAs = React.useCallback(async (src: string) => {
+		try {
+			const response = await fetch(src);
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement("a");
+			link.href = url;
+			link.download = "image";
+			link.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			console.error("Failed to save image:", err);
+		}
+	}, []);
+
+	const handleImageDelete = React.useCallback(() => {
+		editor?.chain().focus().deleteSelection().run();
+	}, [editor]);
+
 	return (
 		<div className="flex flex-1 flex-col overflow-hidden bg-background text-foreground">
-			<div className="flex-1 overflow-auto">
-				<EditorContent editor={editor} />
-			</div>
+			<EditorContextMenu
+				menuState={contextMenuState}
+				onBold={handleBold}
+				onItalic={handleItalic}
+				onUnderline={handleUnderline}
+				onStrike={handleStrike}
+				onCode={handleCode}
+				onHeading={handleHeading}
+				onBulletList={handleBulletList}
+				onOrderedList={handleOrderedList}
+				onTaskList={handleTaskList}
+				onBlockquote={handleBlockquote}
+				onCodeBlock={handleCodeBlock}
+				onParagraph={handleParagraph}
+				onLinkOpen={handleLinkOpen}
+				onLinkCopy={handleLinkCopy}
+				onLinkEdit={handleLinkEdit}
+				onImageCopy={handleImageCopy}
+				onImageSaveAs={handleImageSaveAs}
+				onImageDelete={handleImageDelete}
+			>
+				<div className="flex-1 overflow-auto">
+					<EditorContent editor={editor} />
+				</div>
+			</EditorContextMenu>
 			<div className="flex h-8 shrink-0 items-center justify-between border-t bg-secondary/10 px-4 text-muted-foreground text-xs">
 				<div className="flex gap-4">
 					<span>

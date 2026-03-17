@@ -1,15 +1,27 @@
-import { Cancel01Icon, File01Icon } from "@hugeicons/core-free-icons";
+import { Cancel01Icon, Copy01Icon, File01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
 import type { FileNode } from "@/lib/fs";
 import { cn } from "@/lib/utils";
+
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuSeparator,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 interface TabBarProps {
 	tabs: FileNode[];
 	activePath: string | null;
 	onTabSelect: (file: FileNode) => void;
 	onTabClose: (path: string) => void;
+	onTabsCloseOther?: (keepPath: string) => void;
+	onTabsCloseToRight?: (fromPath: string) => void;
+	onTabsCloseAll?: () => void;
 	onTabsReorder?: (newTabs: FileNode[]) => void;
+	onCopyFilePath?: (path: string) => void;
 	left?: React.ReactNode;
 	right?: React.ReactNode;
 }
@@ -19,7 +31,11 @@ export function TabBar({
 	activePath,
 	onTabSelect,
 	onTabClose,
+	onTabsCloseOther,
+	onTabsCloseToRight,
+	onTabsCloseAll,
 	onTabsReorder,
+	onCopyFilePath,
 	left,
 	right,
 }: TabBarProps) {
@@ -100,67 +116,111 @@ export function TabBar({
 						draggedIndex !== index + 1;
 
 					return (
-						<div
-							key={tab.relativePath}
-							role="tab"
-							aria-selected={isActive}
-							tabIndex={0}
-							draggable={true}
-							onDragStart={(e) => handleDragStart(e, index)}
-							onDragEnd={handleDragEnd}
-							onDragOver={(e) => handleDragOver(e, index)}
-							className={cn(
-								"group relative flex h-9 min-w-36 max-w-52 items-center rounded-t-lg px-3 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-								isActive
-									? "z-10 bg-background text-foreground shadow-[0_-1px_0_0_var(--border),1px_0_0_0_var(--border),-1px_0_0_0_var(--border)]"
-									: "text-muted-foreground hover:bg-background/60 hover:text-foreground/80",
-								draggedIndex === index && "opacity-50",
-							)}
-							onClick={() => onTabSelect(tab)}
-							onKeyDown={(e) => {
-								if (e.key === "Enter" || e.key === " ") {
-									onTabSelect(tab);
-								}
-							}}
-						>
-							{showLeftIndicator && (
-								<div className="-left-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
-							)}
-							{showRightIndicator && (
-								<div className="-right-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
-							)}
-							<div className="flex w-full items-center gap-2">
-								<HugeiconsIcon
-									icon={File01Icon}
+						<ContextMenu>
+							<ContextMenuTrigger asChild>
+								<div
+									key={tab.relativePath}
+									role="tab"
+									aria-selected={isActive}
+									tabIndex={0}
+									draggable={true}
+									onDragStart={(e) => handleDragStart(e, index)}
+									onDragEnd={handleDragEnd}
+									onDragOver={(e) => handleDragOver(e, index)}
 									className={cn(
-										"h-3.5 w-3.5 shrink-0 transition-colors",
+										"group relative flex h-9 min-w-36 max-w-52 items-center rounded-t-lg px-3 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
 										isActive
-											? "text-foreground/70"
-											: "text-muted-foreground/70",
+											? "z-10 bg-background text-foreground shadow-[0_-1px_0_0_var(--border),1px_0_0_0_var(--border),-1px_0_0_0_var(--border)]"
+											: "text-muted-foreground hover:bg-background/60 hover:text-foreground/80",
+										draggedIndex === index && "opacity-50",
 									)}
-								/>
-								<span className="flex-1 truncate text-left font-medium text-[13px]">
-									{tab.name}
-								</span>
-								<button
-									type="button"
-									onClick={(e) => {
-										e.stopPropagation();
-										onTabClose(tab.relativePath);
+									onClick={() => onTabSelect(tab)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											onTabSelect(tab);
+										}
 									}}
-									className={cn(
-										"-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-all",
-										"hover:bg-foreground/10 active:bg-foreground/15",
-										isActive
-											? "opacity-60 hover:opacity-100"
-											: "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
-									)}
-									title="Close Tab"
 								>
-									<HugeiconsIcon icon={Cancel01Icon} className="h-3 w-3" />
-								</button>
-							</div>
-						</div>
+									{showLeftIndicator && (
+										<div className="-left-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
+									)}
+									{showRightIndicator && (
+										<div className="-right-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
+									)}
+									<div className="flex w-full items-center gap-2">
+										<HugeiconsIcon
+											icon={File01Icon}
+											className={cn(
+												"h-3.5 w-3.5 shrink-0 transition-colors",
+												isActive
+													? "text-foreground/70"
+													: "text-muted-foreground/70",
+											)}
+										/>
+										<span className="flex-1 truncate text-left font-medium text-[13px]">
+											{tab.name}
+										</span>
+										<button
+											type="button"
+											onClick={(e) => {
+												e.stopPropagation();
+												onTabClose(tab.relativePath);
+											}}
+											className={cn(
+												"-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-all",
+												"hover:bg-foreground/10 active:bg-foreground/15",
+												isActive
+													? "opacity-60 hover:opacity-100"
+													: "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
+											)}
+											title="Close Tab"
+										>
+											<HugeiconsIcon icon={Cancel01Icon} className="h-3 w-3" />
+										</button>
+									</div>
+								</div>
+							</ContextMenuTrigger>
+							<ContextMenuContent>
+								{onTabsCloseOther && (
+									<ContextMenuItem
+										onClick={() => onTabsCloseOther(tab.relativePath)}
+									>
+										<HugeiconsIcon
+											icon={Cancel01Icon}
+											className="mr-2 h-3.5 w-3.5"
+										/>
+										<span>Close Others</span>
+									</ContextMenuItem>
+								)}
+								{onTabsCloseAll && tabs.length > 1 && (
+									<ContextMenuItem
+										onClick={() => onTabsCloseAll()}
+										variant="destructive"
+									>
+										<span>Close All</span>
+									</ContextMenuItem>
+								)}
+								{onTabsCloseToRight && index < tabs.length - 1 && (
+									<ContextMenuItem
+										onClick={() => onTabsCloseToRight(tab.relativePath)}
+									>
+										<span>Close Tabs to Right</span>
+									</ContextMenuItem>
+								)}
+								<ContextMenuSeparator />
+								{onCopyFilePath && (
+									<ContextMenuItem
+										onClick={() => onCopyFilePath(tab.relativePath)}
+									>
+										<HugeiconsIcon
+											icon={Copy01Icon}
+											className="mr-2 h-3.5 w-3.5"
+										/>
+										<span>Copy Path</span>
+									</ContextMenuItem>
+								)}
+							</ContextMenuContent>
+						</ContextMenu>
 					);
 				})}
 			</div>

@@ -1,12 +1,22 @@
 import {
 	Calendar03Icon,
+	Copy01Icon,
 	DatabaseIcon,
+	Delete01Icon,
+	Download03Icon,
 	File01Icon,
 	Image01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
 import type { FileNode } from "@/lib/fs";
+
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 interface ImageTabProps {
 	file: FileNode;
@@ -150,15 +160,79 @@ export function ImageTab({ file }: ImageTabProps) {
 	return (
 		<div className="flex h-full overflow-hidden bg-background">
 			<div className="flex flex-1 items-center justify-center overflow-auto bg-secondary/5 p-8">
-				<div className="group relative">
-					{imageSrc && (
-						<img
-							src={imageSrc}
-							alt={file.name}
-							className="max-h-full max-w-full rounded-lg bg-checkered shadow-2xl"
-						/>
-					)}
-				</div>
+				<ContextMenu>
+					<ContextMenuTrigger asChild>
+						<div className="group relative cursor-pointer">
+							{imageSrc && (
+								<img
+									src={imageSrc}
+									alt={file.name}
+									className="max-h-full max-w-full rounded-lg bg-checkered shadow-2xl"
+								/>
+							)}
+						</div>
+					</ContextMenuTrigger>
+					<ContextMenuContent>
+						<ContextMenuItem
+							onClick={() => {
+								if (imageSrc) {
+									navigator.clipboard.writeText(imageSrc);
+								}
+							}}
+						>
+							<HugeiconsIcon icon={Copy01Icon} className="mr-2 h-3.5 w-3.5" />
+							<span>Copy Image URL</span>
+						</ContextMenuItem>
+						<ContextMenuItem
+							onClick={() => {
+								if (imageSrc) {
+									fetch(imageSrc)
+										.then((res) => res.blob())
+										.then((blob) => {
+											try {
+												navigator.clipboard.write([
+													new ClipboardItem({
+														[blob.type]: blob,
+													}),
+												]);
+											} catch {
+												navigator.clipboard.writeText(imageSrc);
+											}
+										})
+										.catch(() => {
+											navigator.clipboard.writeText(imageSrc);
+										});
+								}
+							}}
+						>
+							<HugeiconsIcon icon={Copy01Icon} className="mr-2 h-3.5 w-3.5" />
+							<span>Copy Image to Clipboard</span>
+						</ContextMenuItem>
+						<ContextMenuItem
+							onClick={async () => {
+								if (!imageSrc) return;
+								try {
+									const response = await fetch(imageSrc);
+									const blob = await response.blob();
+									const url = URL.createObjectURL(blob);
+									const link = document.createElement("a");
+									link.href = url;
+									link.download = file.name;
+									link.click();
+									URL.revokeObjectURL(url);
+								} catch (err) {
+									console.error("Failed to save image:", err);
+								}
+							}}
+						>
+							<HugeiconsIcon
+								icon={Download03Icon}
+								className="mr-2 h-3.5 w-3.5"
+							/>
+							<span>Save Image As...</span>
+						</ContextMenuItem>
+					</ContextMenuContent>
+				</ContextMenu>
 			</div>
 
 			<div className="w-80 overflow-auto border-l bg-card p-6">

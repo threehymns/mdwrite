@@ -46,6 +46,8 @@ interface SidebarProps {
 	headings?: { level: number; text: string; index: number }[];
 	onHeadingClick?: (index: number) => void;
 	onSearchOpen: () => void;
+	expandedPaths?: Set<string>;
+	onDirectoryToggle?: (path: string, isExpanded: boolean) => void;
 }
 
 function SidebarComponent({
@@ -58,6 +60,8 @@ function SidebarComponent({
 	onCreateNote,
 	activePath,
 	onSearchOpen,
+	expandedPaths,
+	onDirectoryToggle,
 }: SidebarProps) {
 	const [draggedPath, setDraggedPath] = React.useState<string | null>(null);
 	const [dropTargetPath, setDropTargetPath] = React.useState<string | null>(
@@ -129,6 +133,8 @@ function SidebarComponent({
 					onDragEnd={handleDragEnd}
 					onDropTargetChange={handleDropTargetChange}
 					getDraggedNode={() => draggedNodeRef.current}
+					expandedPaths={expandedPaths}
+					onDirectoryToggle={onDirectoryToggle}
 				/>
 			</ScrollArea>
 
@@ -165,6 +171,8 @@ function FileTree({
 	onDragEnd,
 	onDropTargetChange,
 	getDraggedNode,
+	expandedPaths,
+	onDirectoryToggle,
 	level = 0,
 }: {
 	nodes: FileNode[];
@@ -181,6 +189,8 @@ function FileTree({
 	onDragEnd?: () => void;
 	onDropTargetChange?: (path: string | null) => void;
 	getDraggedNode?: () => FileNode | null;
+	expandedPaths?: Set<string>;
+	onDirectoryToggle?: (path: string, isExpanded: boolean) => void;
 	level?: number;
 }) {
 	const flatNodes = React.useMemo(() => {
@@ -341,6 +351,8 @@ function FileTree({
 									onDragEnd={onDragEnd}
 									onDropTargetChange={onDropTargetChange}
 									level={level}
+									expandedPaths={expandedPaths}
+									onDirectoryToggle={onDirectoryToggle}
 								/>
 								{isDropPositionAfter && (
 									<div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary" />
@@ -362,6 +374,8 @@ function FileTree({
 								onDragEnd={onDragEnd}
 								onDropTargetChange={onDropTargetChange}
 								level={level}
+								expandedPaths={expandedPaths}
+								onDirectoryToggle={onDirectoryToggle}
 							/>
 						)}
 					</React.Fragment>
@@ -507,6 +521,8 @@ type FileTreeNodeProps = {
 	onDragEnd?: () => void;
 	onDropTargetChange?: (path: string | null) => void;
 	level: number;
+	expandedPaths?: Set<string>;
+	onDirectoryToggle?: (path: string, isExpanded: boolean) => void;
 };
 
 function FileTreeNodeComponent({
@@ -524,19 +540,30 @@ function FileTreeNodeComponent({
 	onDragEnd,
 	onDropTargetChange,
 	level,
+	expandedPaths,
+	onDirectoryToggle,
 }: FileTreeNodeProps) {
-	const [isOpen, setIsOpen] = React.useState(false);
+	const isControlled = expandedPaths !== undefined && onDirectoryToggle !== undefined;
+	const isExpanded = isControlled
+		? expandedPaths.has(node.relativePath)
+		: false;
+	const [internalIsOpen, setInternalIsOpen] = React.useState(false);
+	const isOpen = isControlled ? isExpanded : internalIsOpen;
 	const [isRenaming, setIsRenaming] = React.useState(false);
 	const isSelected = activePath === node.relativePath;
 
 	const handleToggleOrSelect = React.useCallback(() => {
 		if (isRenaming) return;
 		if (node.kind === "directory") {
-			setIsOpen((prev) => !prev);
+			if (isControlled) {
+				onDirectoryToggle(node.relativePath, !isOpen);
+			} else {
+				setInternalIsOpen((prev) => !prev);
+			}
 		} else {
 			onFileSelect(node);
 		}
-	}, [isRenaming, node, onFileSelect]);
+	}, [isRenaming, node, onFileSelect, isControlled, onDirectoryToggle, isOpen]);
 
 	const handleStartRenaming = React.useCallback(() => {
 		if (!isRenaming) {
@@ -757,6 +784,8 @@ function FileTreeNodeComponent({
 					onDragEnd={onDragEnd}
 					onDropTargetChange={onDropTargetChange}
 					level={level + 1}
+					expandedPaths={expandedPaths}
+					onDirectoryToggle={onDirectoryToggle}
 				/>
 			)}
 		</div>
@@ -769,6 +798,9 @@ function areFileTreeNodePropsEqual(
 ) {
 	const prevSelected = prev.activePath === prev.node.relativePath;
 	const nextSelected = next.activePath === next.node.relativePath;
+
+	const prevExpanded = prev.expandedPaths?.has(prev.node.relativePath) ?? false;
+	const nextExpanded = next.expandedPaths?.has(next.node.relativePath) ?? false;
 
 	return (
 		prev.node === next.node &&
@@ -784,7 +816,9 @@ function areFileTreeNodePropsEqual(
 		prev.onDragStart === next.onDragStart &&
 		prev.onDragEnd === next.onDragEnd &&
 		prev.onDropTargetChange === next.onDropTargetChange &&
-		prevSelected === nextSelected
+		prevSelected === nextSelected &&
+		prevExpanded === nextExpanded &&
+		prev.onDirectoryToggle === next.onDirectoryToggle
 	);
 }
 
