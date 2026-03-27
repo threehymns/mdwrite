@@ -9,14 +9,14 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
-import type { FileNode } from "@/lib/fs";
-
 import {
 	ContextMenu,
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import type { FileNode } from "@/lib/fs";
+import { getFileSystemProvider } from "@/lib/fs";
 
 interface ImageTabProps {
 	file: FileNode;
@@ -37,7 +37,6 @@ export function ImageTab({ file }: ImageTabProps) {
 
 	useEffect(() => {
 		let isMounted = true;
-		const handle = file.handle as FileSystemFileHandle;
 		let currentUrl: string | null = null;
 
 		const extractExif = async (blob: Blob) => {
@@ -123,33 +122,43 @@ export function ImageTab({ file }: ImageTabProps) {
 			}
 		};
 
-		handle.getFile().then(async (f) => {
-			if (!isMounted) return;
-			currentUrl = URL.createObjectURL(f);
-			setImageSrc(currentUrl);
+		const load = async () => {
+			try {
+				const provider = await getFileSystemProvider();
+				const { blob: f, lastModified } = await provider.readFileAsBlob(
+					file.handle,
+				);
+				if (!isMounted) return;
+				currentUrl = URL.createObjectURL(f);
+				setImageSrc(currentUrl);
 
-			const img = new Image();
-			img.onload = async () => {
-				if (isMounted) {
-					const exif = f.type === "image/jpeg" ? await extractExif(f) : {};
-					const { UserComment, ...otherExif } = exif;
-					const filteredExif = Object.fromEntries(
-						Object.entries(otherExif).filter(([_, v]) => v && v !== "0"),
-					);
+				const img = new Image();
+				img.onload = async () => {
+					if (isMounted) {
+						const exif = f.type === "image/jpeg" ? await extractExif(f) : {};
+						const { UserComment, ...otherExif } = exif;
+						const filteredExif = Object.fromEntries(
+							Object.entries(otherExif).filter(([_, v]) => v && v !== "0"),
+						);
 
-					setMetadata({
-						size: `${(f.size / 1024).toFixed(2)} KB`,
-						type: f.type,
-						lastModified: new Date(f.lastModified).toLocaleString(),
-						dimensions: { width: img.width, height: img.height },
-						exif:
-							Object.keys(filteredExif).length > 0 ? filteredExif : undefined,
-						userComment: UserComment,
-					});
-				}
-			};
-			img.src = currentUrl;
-		});
+						setMetadata({
+							size: `${(f.size / 1024).toFixed(2)} KB`,
+							type: f.type,
+							lastModified: new Date(lastModified).toLocaleString(),
+							dimensions: { width: img.width, height: img.height },
+							exif:
+								Object.keys(filteredExif).length > 0 ? filteredExif : undefined,
+							userComment: UserComment,
+						});
+					}
+				};
+				img.src = currentUrl;
+			} catch (err) {
+				console.error("Failed to load image", err);
+			}
+		};
+
+		void load();
 
 		return () => {
 			isMounted = false;

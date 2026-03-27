@@ -40,8 +40,8 @@ interface SidebarProps {
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onMove?: (node: FileNode, targetDirectory: FileNode) => Promise<void>;
-	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
-	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateFolder?: (parentDirPath: string) => void;
+	onCreateNote?: (parentDirPath: string) => void;
 	activePath?: string | null;
 	headings?: { level: number; text: string; index: number }[];
 	onHeadingClick?: (index: number) => void;
@@ -180,8 +180,8 @@ function FileTree({
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onMove?: (targetDirectory: FileNode) => Promise<void>;
-	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
-	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateFolder?: (parentDirPath: string) => void;
+	onCreateNote?: (parentDirPath: string) => void;
 	activePath?: string | null;
 	draggedPath?: string | null;
 	dropTargetPath?: string | null;
@@ -512,8 +512,8 @@ type FileTreeNodeProps = {
 	onDelete?: (node: FileNode) => void;
 	onRename?: (node: FileNode, newName: string) => Promise<void>;
 	onMove?: (targetDirectory: FileNode) => Promise<void>;
-	onCreateFolder?: (parentHandle: FileSystemDirectoryHandle) => void;
-	onCreateNote?: (parentHandle: FileSystemDirectoryHandle) => void;
+	onCreateFolder?: (parentDirPath: string) => void;
+	onCreateNote?: (parentDirPath: string) => void;
 	activePath?: string | null;
 	draggedPath?: string | null;
 	dropTargetPath?: string | null;
@@ -543,7 +543,8 @@ function FileTreeNodeComponent({
 	expandedPaths,
 	onDirectoryToggle,
 }: FileTreeNodeProps) {
-	const isControlled = expandedPaths !== undefined && onDirectoryToggle !== undefined;
+	const isControlled =
+		expandedPaths !== undefined && onDirectoryToggle !== undefined;
 	const isExpanded = isControlled
 		? expandedPaths.has(node.relativePath)
 		: false;
@@ -576,11 +577,11 @@ function FileTreeNodeComponent({
 	}, [node, onDelete]);
 
 	const handleCreateNote = React.useCallback(() => {
-		onCreateNote?.(node.handle as FileSystemDirectoryHandle);
+		onCreateNote?.(node.relativePath);
 	}, [node, onCreateNote]);
 
 	const handleCreateFolder = React.useCallback(() => {
-		onCreateFolder?.(node.handle as FileSystemDirectoryHandle);
+		onCreateFolder?.(node.relativePath);
 	}, [node, onCreateFolder]);
 
 	const handleRenameSubmit = async (newName: string) => {

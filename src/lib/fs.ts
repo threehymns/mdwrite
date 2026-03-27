@@ -1,209 +1,88 @@
-import { get, set } from "idb-keyval";
-import { type Searchable, extractTags, matchQuery } from "./search";
-import { type Frontmatter, parseFrontmatter, serializeFrontmatter } from "./markdown";
+import type { FileSystemProvider } from "./fs-provider";
+import { isNative } from "./platform";
 
-const RECENT_FOLDER_KEY = "recent-folder-handle";
+export type {
+	FileNode,
+	FileSystemProvider,
+	ReadFileResult,
+} from "./fs-provider";
+export type { Searchable } from "./search";
+export { extractTags, matchQuery } from "./search";
 
-export interface FileNode {
-	name: string;
-	kind: "file" | "directory";
-	handle: FileSystemHandle;
-	children?: FileNode[];
-	relativePath: string;
-	parentHandle?: FileSystemDirectoryHandle;
-	icon?: any;
+let _provider: FileSystemProvider | null = null;
+
+export async function getFileSystemProvider(): Promise<FileSystemProvider> {
+	if (_provider) return _provider;
+
+	if (isNative()) {
+		const { CapacitorFileSystemProvider } = await import("./fs-capacitor");
+		_provider = new CapacitorFileSystemProvider();
+	} else {
+		const { WebFileSystemProvider } = await import("./fs-web");
+		_provider = new WebFileSystemProvider();
+	}
+
+	return _provider;
 }
 
-const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
+export function getFileSystemProviderSync(): FileSystemProvider {
+	if (!_provider) {
+		throw new Error(
+			"FileSystemProvider not initialized. Call getFileSystemProvider() first.",
+		);
+	}
+	return _provider;
+}
 
 export async function getFileTree(
-	dirHandle: FileSystemDirectoryHandle,
+	dirHandle: unknown,
 	relativePath = "",
 	showHiddenFiles = false,
-): Promise<FileNode[]> {
-	const nodes: FileNode[] = [];
-	// @ts-expect-error - FileSystemDirectoryHandle has values() but it might not be in the default types yet
-	for await (const entry of dirHandle.values()) {
-		if (!showHiddenFiles && entry.name.startsWith(".")) {
-			continue;
-		}
-		const entryRelativePath = relativePath
-			? `${relativePath}/${entry.name}`
-			: entry.name;
-		if (entry.kind === "directory") {
-			const children = await getFileTree(
-				entry as FileSystemDirectoryHandle,
-				entryRelativePath,
-				showHiddenFiles,
-			);
-			nodes.push({
-				name: entry.name,
-				kind: "directory",
-				handle: entry,
-				relativePath: entryRelativePath,
-				children,
-				parentHandle: dirHandle,
-			});
-		} else if (
-			entry.name.endsWith(".md") ||
-			IMAGE_EXTENSIONS.some((ext) => entry.name.toLowerCase().endsWith(ext))
-		) {
-			nodes.push({
-				name: entry.name,
-				kind: "file",
-				handle: entry,
-				relativePath: entryRelativePath,
-				parentHandle: dirHandle,
-			});
-		}
-	}
-	// Sort: directories first, then files, both alphabetically
-	return nodes.sort((a, b) => {
-		if (a.kind === b.kind) {
-			return a.name.localeCompare(b.name);
-		}
-		return a.kind === "directory" ? -1 : 1;
-	});
+) {
+	const provider = await getFileSystemProvider();
+	return provider.getFileTree(dirHandle, relativePath, showHiddenFiles);
 }
 
-export async function readFile(
-	fileHandle: FileSystemFileHandle,
-): Promise<{ content: string; lastModified: number }> {
-	const file = await fileHandle.getFile();
-	const content = await file.text();
-	return { content, lastModified: file.lastModified };
+export async function readFile(fileHandle: unknown) {
+	const provider = await getFileSystemProvider();
+	return provider.readFile(fileHandle);
 }
 
-export async function writeFile(
-	fileHandle: FileSystemFileHandle,
-	content: string,
-): Promise<number> {
-	const writable = await fileHandle.createWritable();
-	await writable.write(content);
-	await writable.close();
-	const file = await fileHandle.getFile();
-	return file.lastModified;
+export async function writeFile(fileHandle: unknown, content: string) {
+	const provider = await getFileSystemProvider();
+	return provider.writeFile(fileHandle, content);
 }
 
-export async function saveRecentFolder(handle: FileSystemDirectoryHandle) {
-	await set(RECENT_FOLDER_KEY, handle);
+export async function saveRecentFolder(handle: unknown) {
+	const provider = await getFileSystemProvider();
+	return provider.saveRecentFolder(handle);
 }
 
-export async function getRecentFolder(): Promise<FileSystemDirectoryHandle | null> {
-	const handle = await get<FileSystemDirectoryHandle>(RECENT_FOLDER_KEY);
-	if (!handle) return null;
-
-	// Verify permission
-	// @ts-expect-error
-	if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") {
-		return handle;
-	}
-
-	return null;
+export async function getRecentFolder(): Promise<unknown | null> {
+	const provider = await getFileSystemProvider();
+	return provider.getRecentFolder();
 }
 
-export async function getStoredHandle(): Promise<FileSystemDirectoryHandle | null> {
-	return (await get<FileSystemDirectoryHandle>(RECENT_FOLDER_KEY)) || null;
+export async function getStoredHandle(): Promise<unknown | null> {
+	const provider = await getFileSystemProvider();
+	return provider.getStoredHandle();
 }
 
 export async function searchFiles(
-	dirHandle: FileSystemDirectoryHandle,
+	dirHandle: unknown,
 	query: string,
 	relativePath = "",
-): Promise<{ node: FileNode; snippet: string }[]> {
-	const results: { node: FileNode; snippet: string }[] = [];
-
-	// @ts-expect-error
-	for await (const entry of dirHandle.values()) {
-		const entryRelativePath = relativePath
-			? `${relativePath}/${entry.name}`
-			: entry.name;
-
-		if (entry.kind === "directory") {
-			const subResults = await searchFiles(
-				entry as FileSystemDirectoryHandle,
-				query,
-				entryRelativePath,
-			);
-			results.push(...subResults);
-		} else if (entry.name.endsWith(".md")) {
-			const file = await (entry as FileSystemFileHandle).getFile();
-			const content = await file.text();
-
-			const searchable: Searchable = {
-				label: entry.name,
-				path: entryRelativePath,
-				content,
-				tags: extractTags(content),
-			};
-
-			if (matchQuery(query, searchable)) {
-				// Snippet logic: try to find a relevant content match
-				// We'll use a simple heuristic: find the first non-operator term that matches in content
-				const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-				let matchingTerm = "";
-				for (const term of terms) {
-					if (
-						!term.includes(":") &&
-						!term.startsWith("-") &&
-						!term.startsWith("/")
-					) {
-						if (content.toLowerCase().includes(term.toLowerCase())) {
-							matchingTerm = term;
-							break;
-						}
-					}
-				}
-
-				const lowerContent = content.toLowerCase();
-				const lowerTerm = matchingTerm.toLowerCase() || query.toLowerCase();
-				const index = lowerContent.includes(lowerTerm)
-					? lowerContent.indexOf(lowerTerm)
-					: 0;
-
-				const start = Math.max(0, index - 40);
-				const end = Math.min(content.length, index + lowerTerm.length + 40);
-				let snippet = content.substring(start, end);
-				if (start > 0) snippet = `...${snippet}`;
-				if (end < content.length) snippet = `${snippet}...`;
-
-				results.push({
-					node: {
-						name: entry.name,
-						kind: "file",
-						handle: entry,
-						relativePath: entryRelativePath,
-						parentHandle: dirHandle,
-					},
-					snippet,
-				});
-			}
-		}
-	}
-	return results;
+) {
+	const provider = await getFileSystemProvider();
+	return provider.searchFiles(dirHandle, query, relativePath);
 }
 
-export async function requestPermission(
-	handle: FileSystemHandle,
-): Promise<boolean> {
-	// @ts-expect-error
-	return (await handle.requestPermission({ mode: "readwrite" })) === "granted";
+export async function requestPermission(handle: unknown): Promise<boolean> {
+	const provider = await getFileSystemProvider();
+	return provider.requestPermission(handle);
 }
 
-export async function getFileHandleByPath(
-	dirHandle: FileSystemDirectoryHandle,
-	path: string,
-): Promise<FileSystemFileHandle | null> {
-	const parts = path.split("/").filter((p) => p !== "." && p !== "");
-	let currentDir = dirHandle;
-
-	try {
-		for (let i = 0; i < parts.length - 1; i++) {
-			currentDir = await currentDir.getDirectoryHandle(parts[i]);
-		}
-		return await currentDir.getFileHandle(parts[parts.length - 1]);
-	} catch (err) {
-		console.error(`Failed to get file handle for path: ${path}`, err);
-		return null;
-	}
+export async function getFileHandleByPath(dirHandle: unknown, path: string) {
+	const provider = await getFileSystemProvider();
+	return provider.getFileHandleByPath(dirHandle, path);
 }

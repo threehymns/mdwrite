@@ -7,17 +7,11 @@ import { CommandPalette } from "./ui/command-palette";
 interface SearchDialogProps {
 	isOpen: boolean;
 	onClose: () => void;
-	rootHandle: FileSystemDirectoryHandle | null;
+	rootHandle: unknown | null;
 	onFileSelect: (file: FileNode) => void;
 }
 
-function HighlightedText({
-	text,
-	query,
-}: {
-	text: string;
-	query: string;
-}) {
+function HighlightedText({ text, query }: { text: string; query: string }) {
 	if (!query.trim()) {
 		return <span>{text}</span>;
 	}
@@ -26,11 +20,7 @@ function HighlightedText({
 	const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
 	let highlight = "";
 	for (const term of terms) {
-		if (
-			!term.includes(":") &&
-			!term.startsWith("-") &&
-			!term.startsWith("/")
-		) {
+		if (!term.includes(":") && !term.startsWith("-") && !term.startsWith("/")) {
 			const cleaned = term.replace(/"/g, "");
 			if (text.toLowerCase().includes(cleaned.toLowerCase())) {
 				highlight = cleaned;

@@ -10,6 +10,11 @@
 		"dev:desktop": "concurrently -k -n VITE,ELECTRON -c cyan,magenta \"vite dev --port 3000\" \"wait-on http://localhost:3000 && cross-env VITE_DEV_SERVER_URL=http://localhost:3000 electron .\"",
 		"build:desktop": "vite build && electron-builder",
 		"pack:desktop": "vite build && electron-builder --dir",
+		"cap:sync": "cap sync",
+		"cap:android": "vite build && cap sync android && cap open android",
+		"cap:ios": "vite build && cap sync ios && cap open ios",
+		"cap:run:android": "vite build && cap run android",
+		"cap:run:ios": "vite build && cap run ios",
 		"test": "vitest run",
 		"lint": "biome lint",
 		"format": "biome format --write",
@@ -17,6 +22,10 @@
 	},
 	"dependencies": {
 		"@base-ui/react": "^1.0.0",
+		"@capacitor/app": "^8.1.0",
+		"@capacitor/core": "^8.3.0",
+		"@capacitor/filesystem": "^8.1.2",
+		"@capacitor/preferences": "^8.0.1",
 		"@codemirror/commands": "^6.10.1",
 		"@codemirror/lang-cpp": "^6.0.3",
 		"@codemirror/lang-css": "^6.3.1",
@@ -74,6 +83,7 @@
 		"vite-tsconfig-paths": "^5.1.4"
 	},
 	"devDependencies": {
+		"@capacitor/cli": "^8.3.0",
 		"@tanstack/devtools-vite": "^0.3.11",
 		"@tanstack/eslint-config": "^0.3.0",
 		"@testing-library/dom": "^10.4.0",

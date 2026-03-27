@@ -607,9 +607,7 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
 				const edgeSet = new Set<string>();
 
 				for (const file of markdownFiles) {
-					const { content, lastModified } = await readFile(
-						file.handle as FileSystemFileHandle,
-					);
+					const { content, lastModified } = await readFile(file.handle);
 
 					// Extract tags
 					const tags = extractTags(content);

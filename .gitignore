@@ -11,3 +11,9 @@ count.txt
 .output
 .vinxi
 todos.json
+
+# Capacitor native projects
+android/
+ios/
+*.xcworkspace
+*.xcuserdata

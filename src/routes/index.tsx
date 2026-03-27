@@ -1,6 +1,5 @@
 import {
 	FolderOpenIcon,
-	NeuralNetworkIcon,
 	PlusSignIcon,
 	Search01Icon,
 	SidebarLeft01Icon,
@@ -28,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import type { Action } from "@/lib/actions";
 import {
 	type FileNode,
-	getFileHandleByPath,
+	getFileSystemProvider,
 	getFileTree,
 	getRecentFolder,
 	getStoredHandle,
@@ -38,11 +37,7 @@ import {
 	writeFile,
 } from "@/lib/fs";
 import { parseInternalLinkMarkdown } from "@/lib/internal-links";
-import {
-	type Frontmatter,
-	parseFrontmatter,
-	serializeFrontmatter,
-} from "@/lib/markdown";
+import { parseFrontmatter } from "@/lib/markdown";
 import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/")({ component: App });
@@ -53,6 +48,14 @@ const SIDEBAR_OPEN_STORAGE_KEY = "mdwrite-sidebar-open";
 const SIDEBAR_EXPANDED_PATHS_KEY = "mdwrite-sidebar-expanded-paths";
 const CONTENT_STATE_SYNC_DELAY_MS = 180;
 const GRAPH_TAB_PATH = "__graph_view__";
+
+function getHandleName(handle: unknown): string {
+	if (typeof handle === "string") {
+		const parts = handle.split("/").filter(Boolean);
+		return parts[parts.length - 1] || handle;
+	}
+	return (handle as FileSystemDirectoryHandle).name || "Folder";
+}
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
 	for (const node of nodes) {
@@ -84,7 +87,7 @@ function normalizePath(path: string): string {
 	return result.join("/");
 }
 
-function createGraphTabNode(handle: FileSystemHandle): FileNode {
+function createGraphTabNode(handle: unknown): FileNode {
 	return {
 		name: "Graph View",
 		kind: "file",
@@ -122,10 +125,8 @@ function App() {
 	React.useEffect(() => {
 		shortcutsRef.current = shortcuts;
 	}, [shortcuts]);
-	const [rootHandle, setRootHandle] =
-		React.useState<FileSystemDirectoryHandle | null>(null);
-	const [storedHandle, setStoredHandle] =
-		React.useState<FileSystemDirectoryHandle | null>(null);
+	const [rootHandle, setRootHandle] = React.useState<unknown | null>(null);
+	const [storedHandle, setStoredHandle] = React.useState<unknown | null>(null);
 	const [files, setFiles] = React.useState<FileNode[]>([]);
 	const [tabs, setTabs] = React.useState<FileNode[]>([]);
 	const [activePath, setActivePath] = React.useState<string | null>(null);
@@ -268,7 +269,7 @@ function App() {
 	}, [headings]);
 
 	const refreshFiles = React.useCallback(
-		async (handle: FileSystemDirectoryHandle) => {
+		async (handle: unknown) => {
 			const tree = await getFileTree(handle, "", showHiddenFiles);
 			setFiles(tree);
 		},
@@ -280,14 +281,12 @@ function App() {
 
 	const handleOpenFolder = React.useCallback(async () => {
 		try {
-			const handle = await (
-				window as unknown as {
-					showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
-				}
-			).showDirectoryPicker();
-			setRootHandle(handle);
-			await saveRecentFolder(handle);
-			await refreshFiles(handle);
+			const provider = await getFileSystemProvider();
+			const result = await provider.pickDirectory();
+			if (!result) return;
+			setRootHandle(result.handle);
+			await saveRecentFolder(result.handle);
+			await refreshFiles(result.handle);
 			setIsSidebarOpen(true);
 		} catch (err) {
 			console.error("Failed to open folder", err);
@@ -309,11 +308,16 @@ function App() {
 				// Restore tabs from localStorage
 				const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
 				const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
-				const showHiddenFilesOnInit = localStorage.getItem("showHiddenFiles") === "true";
+				const showHiddenFilesOnInit =
+					localStorage.getItem("showHiddenFiles") === "true";
 
 				if (savedTabs) {
 					try {
-						const tree = await getFileTree(storedHandle, "", showHiddenFilesOnInit);
+						const tree = await getFileTree(
+							storedHandle,
+							"",
+							showHiddenFilesOnInit,
+						);
 						const paths = JSON.parse(savedTabs) as string[];
 						const restoredTabs: FileNode[] = [];
 						for (const path of paths) {
@@ -337,7 +341,7 @@ function App() {
 									setProperties([]);
 								} else {
 									const { content: text, lastModified } = await readFile(
-										activeNode.handle as FileSystemFileHandle,
+										activeNode.handle,
 									);
 									lastModifiedRef.current = lastModified;
 									const {
@@ -408,9 +412,7 @@ function App() {
 				setActivePath(file.relativePath);
 
 				if (!isImage) {
-					const { content: text, lastModified } = await readFile(
-						file.handle as FileSystemFileHandle,
-					);
+					const { content: text, lastModified } = await readFile(file.handle);
 					lastModifiedRef.current = lastModified;
 					const {
 						frontmatter: fm,
@@ -572,7 +574,8 @@ function App() {
 
 			try {
 				if (node.parentHandle) {
-					await node.parentHandle.removeEntry(node.name, { recursive: true });
+					const provider = await getFileSystemProvider();
+					await provider.deleteEntry(node.parentHandle, node.name);
 					if (rootHandle) await refreshFiles(rootHandle);
 
 					setTabs((prev) =>
@@ -596,30 +599,25 @@ function App() {
 	const handleRenameFile = React.useCallback(
 		async (node: FileNode, newName: string) => {
 			try {
-				// @ts-expect-error
-				if (typeof node.handle.move === "function") {
-					// @ts-expect-error
-					await node.handle.move(newName);
-					if (rootHandle) await refreshFiles(rootHandle);
+				const provider = await getFileSystemProvider();
+				await provider.renameEntry(node, newName);
+				if (rootHandle) await refreshFiles(rootHandle);
 
-					setTabs((prev) =>
-						prev.map((t) => {
-							if (t.relativePath === node.relativePath) {
-								const newRelativePath = t.relativePath.replace(
-									node.name,
-									newName,
-								);
-								return { ...t, name: newName, relativePath: newRelativePath };
-							}
-							return t;
-						}),
-					);
+				setTabs((prev) =>
+					prev.map((t) => {
+						if (t.relativePath === node.relativePath) {
+							const newRelativePath = t.relativePath.replace(
+								node.name,
+								newName,
+							);
+							return { ...t, name: newName, relativePath: newRelativePath };
+						}
+						return t;
+					}),
+				);
 
-					if (activePathRef.current === node.relativePath) {
-						setActivePath(node.relativePath.replace(node.name, newName));
-					}
-				} else {
-					alert("Renaming is not supported in this browser.");
+				if (activePathRef.current === node.relativePath) {
+					setActivePath(node.relativePath.replace(node.name, newName));
 				}
 			} catch (err) {
 				console.error("Failed to rename", err);
@@ -643,62 +641,37 @@ function App() {
 			}
 
 			try {
-				const targetHandle =
-					targetDirectory.handle as FileSystemDirectoryHandle;
-				if (node.parentHandle) {
-					const sameParent = await node.parentHandle.isSameEntry(targetHandle);
-					if (sameParent) return;
-				}
+				const provider = await getFileSystemProvider();
+				await provider.moveEntry(node, targetDirectory.handle);
 
-				// @ts-expect-error - move() is available in supporting browsers
-				if (typeof node.handle.move === "function") {
-					try {
-						// @ts-expect-error - move() is available in supporting browsers
-						await node.handle.move(targetHandle);
+				const oldPrefix = node.relativePath;
+				const newPrefix = `${targetDirectory.relativePath}/${node.name}`;
 
-						const oldPrefix = node.relativePath;
-						const newPrefix = `${targetDirectory.relativePath}/${node.name}`;
-
-						setTabs((prev) =>
-							prev.map((tab) => {
-								if (
-									tab.relativePath !== oldPrefix &&
-									!tab.relativePath.startsWith(`${oldPrefix}/`)
-								) {
-									return tab;
-								}
-								return {
-									...tab,
-									relativePath: `${newPrefix}${tab.relativePath.slice(oldPrefix.length)}`,
-								};
-							}),
-						);
-
+				setTabs((prev) =>
+					prev.map((tab) => {
 						if (
-							activePathRef.current === oldPrefix ||
-							activePathRef.current?.startsWith(`${oldPrefix}/`)
+							tab.relativePath !== oldPrefix &&
+							!tab.relativePath.startsWith(`${oldPrefix}/`)
 						) {
-							setActivePath(
-								`${newPrefix}${activePathRef.current.slice(oldPrefix.length)}`,
-							);
+							return tab;
 						}
+						return {
+							...tab,
+							relativePath: `${newPrefix}${tab.relativePath.slice(oldPrefix.length)}`,
+						};
+					}),
+				);
 
-						if (rootHandle) await refreshFiles(rootHandle);
-					} catch (err) {
-						console.error("Failed to move:", err);
-						alert(
-							node.kind === "directory"
-								? "Moving folders failed. They may need to be empty."
-								: "Failed to move. Check for permissions or name conflicts.",
-						);
-					}
-				} else {
-					alert(
-						node.kind === "directory"
-							? "Moving folders is not supported in this browser."
-							: "Moving files is not supported in this browser.",
+				if (
+					activePathRef.current === oldPrefix ||
+					activePathRef.current?.startsWith(`${oldPrefix}/`)
+				) {
+					setActivePath(
+						`${newPrefix}${activePathRef.current.slice(oldPrefix.length)}`,
 					);
 				}
+
+				if (rootHandle) await refreshFiles(rootHandle);
 			} catch (err) {
 				console.error("Failed to move", err);
 				alert("Failed to move. Check for permissions or name conflicts.");
@@ -714,7 +687,8 @@ function App() {
 
 		const name = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
 		try {
-			const fileHandle = await rootHandle.getFileHandle(name, { create: true });
+			const provider = await getFileSystemProvider();
+			const fileHandle = await provider.createFile(rootHandle, name);
 			await refreshFiles(rootHandle);
 			const newNode: FileNode = {
 				name,
@@ -734,26 +708,25 @@ function App() {
 	}, [handleNewFile]);
 
 	const handleCreateNote = React.useCallback(
-		async (parentHandle: FileSystemDirectoryHandle) => {
+		async (parentDirPath: string) => {
 			const fileName = prompt("Enter file name (e.g. notes.md)");
 			if (!fileName) return;
 
 			const name = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
 			try {
-				const fileHandle = await parentHandle.getFileHandle(name, {
-					create: true,
-				});
+				const provider = await getFileSystemProvider();
+				const fullParentPath = parentDirPath
+					? `${rootHandle}/${parentDirPath}`
+					: rootHandle;
+				const fileHandle = await provider.createFile(fullParentPath, name);
 				if (rootHandle) await refreshFiles(rootHandle);
-				const parentPath = (
-					parentHandle as unknown as { relativePath?: string }
-				).relativePath;
-				const relativePath = parentPath ? `${parentPath}/${name}` : name;
+				const relativePath = parentDirPath ? `${parentDirPath}/${name}` : name;
 				const newNode: FileNode = {
 					name,
 					kind: "file",
 					handle: fileHandle,
 					relativePath,
-					parentHandle,
+					parentHandle: fullParentPath,
 				};
 				handleFileSelect(newNode);
 			} catch (err) {
@@ -764,12 +737,16 @@ function App() {
 	);
 
 	const handleCreateFolder = React.useCallback(
-		async (parentHandle: FileSystemDirectoryHandle) => {
+		async (parentDirPath: string) => {
 			const folderName = prompt("Enter folder name");
 			if (!folderName) return;
 
 			try {
-				await parentHandle.getDirectoryHandle(folderName, { create: true });
+				const provider = await getFileSystemProvider();
+				const fullParentPath = parentDirPath
+					? `${rootHandle}/${parentDirPath}`
+					: rootHandle;
+				await provider.createDirectory(fullParentPath, folderName);
 				if (rootHandle) await refreshFiles(rootHandle);
 			} catch (err) {
 				console.error("Failed to create folder", err);
@@ -783,10 +760,9 @@ function App() {
 			contentRef.current = newContent;
 			scheduleContentSync(newContent, currentFile?.relativePath ?? null);
 
-			if (!currentFile || currentFile.handle.kind !== "file") return;
+			if (!currentFile || currentFile.kind !== "file") return;
 
 			const filePath = currentFile.relativePath;
-			const fileHandle = currentFile.handle as FileSystemFileHandle;
 
 			const existingTimeout = saveTimeoutRef.current.get(filePath);
 			if (existingTimeout !== undefined) {
@@ -797,7 +773,7 @@ function App() {
 				saveTimeoutRef.current.delete(filePath);
 				const fmStr = serializeProperties(properties);
 				const fullContent = fmStr + newContent;
-				writeFile(fileHandle, fullContent)
+				writeFile(currentFile.handle, fullContent)
 					.then((lastModified) => {
 						lastModifiedRef.current = lastModified;
 					})
@@ -826,21 +802,16 @@ function App() {
 			if (!currentFile || !currentFile.parentHandle) return null;
 
 			try {
-				const assetsHandle = await currentFile.parentHandle.getDirectoryHandle(
-					"assets",
-					{ create: true },
+				const provider = await getFileSystemProvider();
+				const path = await provider.writeFileFromBlob(
+					currentFile.parentHandle,
+					file.name,
+					file,
 				);
-
-				const fileHandle = await assetsHandle.getFileHandle(file.name, {
-					create: true,
-				});
-				const writable = await fileHandle.createWritable();
-				await writable.write(file);
-				await writable.close();
 
 				if (rootHandle) await refreshFiles(rootHandle);
 
-				return `./assets/${file.name}`;
+				return path;
 			} catch (err) {
 				console.error("Failed to upload image", err);
 				return null;
@@ -861,13 +832,13 @@ function App() {
 
 			if (!currentFile || !currentFile.parentHandle) return null;
 
-			const fileHandle = await getFileHandleByPath(
+			const provider = await getFileSystemProvider();
+			const fileHandle = await provider.getFileHandleByPath(
 				currentFile.parentHandle,
 				path,
 			);
 			if (fileHandle) {
-				const file = await fileHandle.getFile();
-				return URL.createObjectURL(file);
+				return await provider.resolveImageUrl(fileHandle);
 			}
 
 			return null;
@@ -934,17 +905,20 @@ function App() {
 		],
 	);
 
-	const handleDirectoryToggle = React.useCallback((path: string, isExpanded: boolean) => {
-		setExpandedPaths((prev) => {
-			const next = new Set(prev);
-			if (isExpanded) {
-				next.add(path);
-			} else {
-				next.delete(path);
-			}
-			return next;
-		});
-	}, []);
+	const handleDirectoryToggle = React.useCallback(
+		(path: string, isExpanded: boolean) => {
+			setExpandedPaths((prev) => {
+				const next = new Set(prev);
+				if (isExpanded) {
+					next.add(path);
+				} else {
+					next.delete(path);
+				}
+				return next;
+			});
+		},
+		[],
+	);
 
 	React.useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -1058,7 +1032,7 @@ function App() {
 									setProperties([]);
 								} else {
 									const { content: text, lastModified } = await readFile(
-										activeNode.handle as FileSystemFileHandle,
+										activeNode.handle,
 									);
 									lastModifiedRef.current = lastModified;
 									const {
@@ -1093,16 +1067,16 @@ function App() {
 	}, [setContentImmediate]);
 
 	React.useEffect(() => {
-		if (!currentFile || currentFile.handle.kind !== "file") return;
-
-		const handle = currentFile.handle as FileSystemFileHandle;
+		if (!currentFile || currentFile.kind !== "file") return;
 
 		const checkFile = async () => {
 			try {
-				const file = await handle.getFile();
+				const provider = await getFileSystemProvider();
+				const { content: text, lastModified } = await provider.readFile(
+					currentFile.handle,
+				);
 
-				if (file.lastModified > lastModifiedRef.current) {
-					const text = await file.text();
+				if (lastModified > lastModifiedRef.current) {
 					if (text !== contentRef.current) {
 						const {
 							frontmatter: fm,
@@ -1117,7 +1091,7 @@ function App() {
 							hasFrontmatter ? body : text,
 						);
 						setContentImmediate(processed);
-						lastModifiedRef.current = file.lastModified;
+						lastModifiedRef.current = lastModified;
 					}
 				}
 			} catch (err) {
@@ -1125,13 +1099,13 @@ function App() {
 			}
 		};
 
-		if ("FileSystemObserver" in window) {
-			// @ts-expect-error
-			const observer = new FileSystemObserver(async (_records) => {
+		if (typeof window !== "undefined" && "FileSystemObserver" in window) {
+			// @ts-expect-error - FileSystemObserver is an experimental API
+			const observer = new FileSystemObserver(async (_records: unknown) => {
 				await checkFile();
 			});
 
-			observer.observe(handle);
+			observer.observe(currentFile.handle);
 			return () => observer.disconnect();
 		}
 
@@ -1163,7 +1137,7 @@ function App() {
 						<HugeiconsIcon icon={FolderOpenIcon} className="mr-2 h-5 w-5" />
 						Open Folder
 					</Button>
-					{storedHandle && (
+					{storedHandle != null && (
 						<Button
 							variant="outline"
 							size="lg"
@@ -1171,7 +1145,7 @@ function App() {
 							type="button"
 							className="text-foreground"
 						>
-							Reopen {storedHandle.name}
+							Reopen {getHandleName(storedHandle)}
 						</Button>
 					)}
 				</div>
@@ -1230,7 +1204,7 @@ function App() {
 					right={
 						<div className="flex items-center gap-2">
 							<span className="hidden text-muted-foreground text-xs lg:inline">
-								{rootHandle.name}
+								{getHandleName(rootHandle)}
 							</span>
 							<Button
 								variant="outline"
@@ -1269,10 +1243,8 @@ function App() {
 										if (hasEmptyKeys) return;
 										const fmStr = serializeProperties(newProps);
 										const fullContent = fmStr + content;
-										if (currentFile && currentFile.handle.kind === "file") {
-											const fileHandle =
-												currentFile.handle as FileSystemFileHandle;
-											writeFile(fileHandle, fullContent)
+										if (currentFile && currentFile.kind === "file") {
+											writeFile(currentFile.handle, fullContent)
 												.then((lastModified) => {
 													lastModifiedRef.current = lastModified;
 												})
