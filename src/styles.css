@@ -8,314 +8,314 @@
 @custom-variant dark (&:is(.dark *));
 
 .dark {
-	color-scheme: dark;
+  color-scheme: dark;
 }
 
 @theme inline {
-	--font-sans: "Figtree Variable", sans-serif;
-	--color-sidebar-ring: var(--sidebar-ring);
-	--color-sidebar-border: var(--sidebar-border);
-	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-	--color-sidebar-accent: var(--sidebar-accent);
-	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-	--color-sidebar-primary: var(--sidebar-primary);
-	--color-sidebar-foreground: var(--sidebar-foreground);
-	--color-sidebar: var(--sidebar);
-	--color-chart-5: var(--chart-5);
-	--color-chart-4: var(--chart-4);
-	--color-chart-3: var(--chart-3);
-	--color-chart-2: var(--chart-2);
-	--color-chart-1: var(--chart-1);
-	--color-ring: var(--ring);
-	--color-input: var(--input);
-	--color-border: var(--border);
-	--color-destructive: var(--destructive);
-	--color-accent-foreground: var(--accent-foreground);
-	--color-accent: var(--accent);
-	--color-muted-foreground: var(--muted-foreground);
-	--color-muted: var(--muted);
-	--color-secondary-foreground: var(--secondary-foreground);
-	--color-secondary: var(--secondary);
-	--color-primary-foreground: var(--primary-foreground);
-	--color-primary: var(--primary);
-	--color-popover-foreground: var(--popover-foreground);
-	--color-popover: var(--popover);
-	--color-card-foreground: var(--card-foreground);
-	--color-card: var(--card);
-	--color-foreground: var(--foreground);
-	--color-background: var(--background);
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
-	--radius-xl: calc(var(--radius) + 4px);
-	--radius-2xl: calc(var(--radius) + 8px);
-	--radius-3xl: calc(var(--radius) + 12px);
-	--radius-4xl: calc(var(--radius) + 16px);
+  --font-sans: "Figtree Variable", sans-serif;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 @layer base {
-	* {
-		@apply border-border outline-ring/50;
-	}
-	body {
-		@apply font-sans bg-background text-foreground;
-	}
-	html {
-		@apply font-sans;
-	}
-	::selection {
-		@apply bg-primary/30 text-foreground;
-	}
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply font-sans bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  ::selection {
+    @apply bg-primary/30 text-foreground;
+  }
 }
 
 @utility prose-shadcn {
-	/* Main text and headers */
-	--tw-prose-body: hsl(var(--foreground));
-	--tw-prose-headings: hsl(var(--foreground));
-	--tw-prose-lead: hsl(var(--muted-foreground));
-	--tw-prose-bold: hsl(var(--foreground));
+  /* Main text and headers */
+  --tw-prose-body: hsl(var(--foreground));
+  --tw-prose-headings: hsl(var(--foreground));
+  --tw-prose-lead: hsl(var(--muted-foreground));
+  --tw-prose-bold: hsl(var(--foreground));
 
-	/* Interactive and Accents */
-	--tw-prose-links: hsl(var(--primary));
-	--tw-prose-counters: hsl(var(--muted-foreground));
-	--tw-prose-bullets: hsl(var(--primary) / 0.5);
+  /* Interactive and Accents */
+  --tw-prose-links: hsl(var(--primary));
+  --tw-prose-counters: hsl(var(--muted-foreground));
+  --tw-prose-bullets: hsl(var(--primary) / 0.5);
 
-	/* Borders and Dividers */
-	--tw-prose-hr: hsl(var(--border));
-	--tw-prose-quote-borders: hsl(var(--border));
-	--tw-prose-th-borders: hsl(var(--border));
-	--tw-prose-td-borders: hsl(var(--border));
+  /* Borders and Dividers */
+  --tw-prose-hr: hsl(var(--border));
+  --tw-prose-quote-borders: hsl(var(--border));
+  --tw-prose-th-borders: hsl(var(--border));
+  --tw-prose-td-borders: hsl(var(--border));
 
-	/* Quotes and Captions */
-	--tw-prose-quotes: hsl(var(--foreground));
-	--tw-prose-captions: hsl(var(--muted-foreground));
+  /* Quotes and Captions */
+  --tw-prose-quotes: hsl(var(--foreground));
+  --tw-prose-captions: hsl(var(--muted-foreground));
 
-	/* Code Blocks */
-	--tw-prose-code: hsl(var(--foreground) / 0.9);
-	--tw-prose-pre-code: hsl(var(--secondary-foreground));
-	--tw-prose-pre-bg: hsl(var(--secondary));
+  /* Code Blocks */
+  --tw-prose-code: hsl(var(--foreground) / 0.9);
+  --tw-prose-pre-code: hsl(var(--secondary-foreground));
+  --tw-prose-pre-bg: hsl(var(--secondary));
 
-	/* Inverted/Dark mode styles */
-	--tw-prose-invert-body: hsl(var(--foreground) / 0.8);
-	--tw-prose-invert-headings: hsl(var(--foreground));
-	--tw-prose-invert-lead: hsl(var(--muted-foreground));
-	--tw-prose-invert-links: hsl(var(--primary));
-	--tw-prose-invert-bold: hsl(var(--foreground));
-	--tw-prose-invert-counters: hsl(var(--muted-foreground));
-	--tw-prose-invert-bullets: hsl(var(--primary) / 0.6);
-	--tw-prose-invert-hr: hsl(var(--border));
-	--tw-prose-invert-quotes: hsl(var(--foreground));
-	--tw-prose-invert-quote-borders: hsl(var(--border));
-	--tw-prose-invert-captions: hsl(var(--muted-foreground));
-	--tw-prose-invert-code: hsl(var(--foreground) / 0.9);
-	--tw-prose-invert-pre-code: hsl(var(--secondary-foreground));
-	--tw-prose-invert-pre-bg: hsl(var(--secondary));
-	--tw-prose-invert-th-borders: hsl(var(--border));
-	--tw-prose-invert-td-borders: hsl(var(--border));
+  /* Inverted/Dark mode styles */
+  --tw-prose-invert-body: hsl(var(--foreground) / 0.8);
+  --tw-prose-invert-headings: hsl(var(--foreground));
+  --tw-prose-invert-lead: hsl(var(--muted-foreground));
+  --tw-prose-invert-links: hsl(var(--primary));
+  --tw-prose-invert-bold: hsl(var(--foreground));
+  --tw-prose-invert-counters: hsl(var(--muted-foreground));
+  --tw-prose-invert-bullets: hsl(var(--primary) / 0.6);
+  --tw-prose-invert-hr: hsl(var(--border));
+  --tw-prose-invert-quotes: hsl(var(--foreground));
+  --tw-prose-invert-quote-borders: hsl(var(--border));
+  --tw-prose-invert-captions: hsl(var(--muted-foreground));
+  --tw-prose-invert-code: hsl(var(--foreground) / 0.9);
+  --tw-prose-invert-pre-code: hsl(var(--secondary-foreground));
+  --tw-prose-invert-pre-bg: hsl(var(--secondary));
+  --tw-prose-invert-th-borders: hsl(var(--border));
+  --tw-prose-invert-td-borders: hsl(var(--border));
 }
 
 /* Experimental stylable select element for language selection */
 .language-select {
-	@apply h-7 cursor-pointer border-none bg-transparent px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground focus-visible:ring-0;
+  @apply h-7 cursor-pointer border-none bg-transparent px-0 py-0 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground focus-visible:ring-0;
 }
 
 @supports (appearance: base-select) {
-	.language-select,
-	/*biome-ignore lint: experimental css pseudo element*/
-		.language-select::picker(select) {
-		appearance: base-select;
-	}
+  .language-select,
+  /*biome-ignore lint: experimental css pseudo element*/
+    .language-select::picker(select) {
+    appearance: base-select;
+  }
 
-	/*biome-ignore lint: experimental css pseudo element*/
-	.language-select::picker-icon {
-		display: none;
-	}
+  /*biome-ignore lint: experimental css pseudo element*/
+  .language-select::picker-icon {
+    display: none;
+  }
 
-	.language-select > button {
-		display: flex;
-		align-items: center;
-		gap: 0.25rem;
-		background: transparent;
-		border: none;
-		color: var(--muted-foreground);
-		cursor: pointer;
-		font-size: 0.75rem;
-		height: 1.75rem;
-		padding: 0;
-		transition: color 0.2s ease;
-	}
+  .language-select > button {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: transparent;
+    border: none;
+    color: var(--muted-foreground);
+    cursor: pointer;
+    font-size: 0.75rem;
+    height: 1.75rem;
+    padding: 0;
+    transition: color 0.2s ease;
+  }
 
-	.language-select > button:hover {
-		color: var(--foreground);
-	}
+  .language-select > button:hover {
+    color: var(--foreground);
+  }
 
-	.language-select > button:focus-visible {
-		outline: 2px solid var(--ring);
-		outline-offset: -1px;
-	}
+  .language-select > button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+  }
 
-	/*biome-ignore lint: experimental css pseudo element*/
-	.language-select::picker(select) {
-		background-color: var(--popover);
-		border: 1px solid var(--border);
-		border-radius: 0.75rem;
-		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-		color: var(--popover-foreground);
-		font-size: 0.875rem;
-		padding: 4px;
-	}
+  /*biome-ignore lint: experimental css pseudo element*/
+  .language-select::picker(select) {
+    background-color: var(--popover);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    color: var(--popover-foreground);
+    font-size: 0.875rem;
+    padding: 4px;
+  }
 
-	.language-select option {
-		padding: 0.25rem 0.5rem;
-		border-radius: calc(var(--radius) - 2px);
-	}
+  .language-select option {
+    padding: 0.25rem 0.5rem;
+    border-radius: calc(var(--radius) - 2px);
+  }
 
-	.language-select option:hover {
-		background-color: var(--accent);
-		color: var(--accent-foreground);
-	}
+  .language-select option:hover {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
 
-	/*biome-ignore lint: experimental css pseudo element*/
-	.language-select option::checkmark {
-		display: inline-block;
-		order: 1;
-		margin: 4px 0 auto auto;
-		width: 14px;
-		height: 14px;
-		background: var(--foreground);
-		content: "";
-		mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20color%3D%22black%22%20class%3D%22pointer-events-none%22%20stroke-width%3D%222%22%20stroke%3D%22black%22%3E%3Cpath%20d%3D%22M5%2014L8.5%2017.5L19%206.5%22%20stroke%3D%22black%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%222%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E");
-		mask-repeat: no-repeat;
-		mask-size: contain;
-	}
+  /*biome-ignore lint: experimental css pseudo element*/
+  .language-select option::checkmark {
+    display: inline-block;
+    order: 1;
+    margin: 4px 0 auto auto;
+    width: 14px;
+    height: 14px;
+    background: var(--foreground);
+    content: "";
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20color%3D%22black%22%20class%3D%22pointer-events-none%22%20stroke-width%3D%222%22%20stroke%3D%22black%22%3E%3Cpath%20d%3D%22M5%2014L8.5%2017.5L19%206.5%22%20stroke%3D%22black%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%222%22%3E%3C%2Fpath%3E%3C%2Fsvg%3E");
+    mask-repeat: no-repeat;
+    mask-size: contain;
+  }
 }
 
 /* Task list styling */
 .ProseMirror ul[data-type="taskList"] {
-	list-style: none;
-	padding: 0;
-	margin: 1rem 0;
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
 }
 
 .ProseMirror ul[data-type="taskList"] li {
-	display: flex;
-	margin-top: 0.5rem;
-	margin-bottom: 0.5rem;
-	align-items: flex-start;
+  display: flex;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  align-items: flex-start;
 }
 
 .ProseMirror ul[data-type="taskList"] li > label {
-	flex: 0 0 auto;
-	margin-right: 0.75rem;
-	user-select: none;
-	display: flex;
-	align-items: center;
-	padding-top: 0.25rem;
+  flex: 0 0 auto;
+  margin-right: 0.75rem;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  padding-top: 0.25rem;
 }
 
 .ProseMirror ul[data-type="taskList"] li > div {
-	flex: 1 1 auto;
-	min-width: 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .ProseMirror ul[data-type="taskList"] li input[type="checkbox"] {
-	appearance: none;
-	width: 1.2rem;
-	height: 1.2rem;
-	border-radius: 0.375rem;
-	border: 1.5px solid var(--border);
-	background-color: transparent;
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-	margin: 0;
-	position: relative;
+  appearance: none;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 0.375rem;
+  border: 1.5px solid var(--border);
+  background-color: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  margin: 0;
+  position: relative;
 }
 
 .ProseMirror ul[data-type="taskList"] li input[type="checkbox"]:hover {
-	border-color: var(--primary);
-	background-color: var(--primary-foreground);
+  border-color: var(--primary);
+  background-color: var(--primary-foreground);
 }
 
 .ProseMirror ul[data-type="taskList"] li input[type="checkbox"]:checked {
-	background-color: var(--primary);
-	border-color: var(--primary);
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .ProseMirror ul[data-type="taskList"] li input[type="checkbox"]:checked::after {
-	content: "";
-	display: block;
-	width: 0.35rem;
-	height: 0.6rem;
-	border: solid var(--primary-foreground);
-	border-width: 0 2px 2px 0;
-	transform: rotate(45deg) translate(-1px, -1px);
+  content: "";
+  display: block;
+  width: 0.35rem;
+  height: 0.6rem;
+  border: solid var(--primary-foreground);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-1px, -1px);
 }
 
 .ProseMirror ul[data-type="taskList"] li[data-checked="true"] > div {
-	@apply text-muted-foreground line-through decoration-muted-foreground/50 transition-all duration-300;
+  @apply text-muted-foreground line-through decoration-muted-foreground/50 transition-all duration-300;
 }
 
 .ProseMirror ul[data-type="taskList"] li p {
-	margin: 0;
+  margin: 0;
 }
 
 .ProseMirror .task-list-item input[type="checkbox"] {
-	appearance: none;
-	width: 1.1rem;
-	height: 1.1rem;
-	border-radius: 0.25rem;
-	border: 1px solid var(--border);
-	margin-right: 0.5rem;
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	transition: all 0.2s ease;
-	vertical-align: middle;
+  appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border);
+  margin-right: 0.5rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  vertical-align: middle;
 }
 
 .ProseMirror .task-list-item input[type="checkbox"]:checked {
-	background-color: var(--primary);
-	border-color: var(--primary);
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .ProseMirror .task-list-item input[type="checkbox"]:checked::after {
-	content: "✓";
-	color: white;
-	font-size: 0.75rem;
-	font-weight: bold;
+  content: "✓";
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
 }
 
 .ProseMirror .task-list-item input[type="checkbox"]:checked {
-	background-color: var(--primary);
-	border-color: var(--primary);
+  background-color: var(--primary);
+  border-color: var(--primary);
 }
 
 .ProseMirror .task-list-item input[type="checkbox"]:checked::after {
-	content: "✓";
-	display: block;
-	color: white;
-	font-size: 0.75rem;
-	line-height: 1;
-	text-align: center;
+  content: "✓";
+  display: block;
+  color: white;
+  font-size: 0.75rem;
+  line-height: 1;
+  text-align: center;
 }
 
 .ProseMirror .task-list-item[data-checked="true"] {
-	color: var(--muted-foreground);
+  color: var(--muted-foreground);
 }
 
 /* Bullet point styling - slightly transparent */
 .ProseMirror ul > li::marker,
 .ProseMirror ul > li::before {
-	color: color-mix(in oklab, var(--primary), transparent 50%);
+  color: color-mix(in oklab, var(--primary), transparent 50%);
 }
 
 .ProseMirror ol > li::marker,
 .ProseMirror ol > li::before {
-	color: color-mix(in oklab, var(--muted-foreground), transparent 30%);
+  color: color-mix(in oklab, var(--muted-foreground), transparent 30%);
 }
 
 /* Dark mode bullet styling */
@@ -323,33 +323,33 @@
 .dark .ProseMirror ul > li::before,
 .ProseMirror.dark ul > li::marker,
 .ProseMirror.dark ul > li::before {
-	color: color-mix(in oklab, var(--primary), transparent 40%);
+  color: color-mix(in oklab, var(--primary), transparent 40%);
 }
 
 .dark .ProseMirror ol > li::marker,
 .dark .ProseMirror ol > li::before,
 .ProseMirror.dark ol > li::marker,
 .ProseMirror.dark ol > li::before {
-	color: color-mix(in oklab, var(--muted-foreground), transparent 20%);
+  color: color-mix(in oklab, var(--muted-foreground), transparent 20%);
 }
 
 /* Tighten list item spacing */
 .ProseMirror ul,
 .ProseMirror ol {
-	margin-top: 0.25rem;
-	margin-bottom: 0.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
 }
 
 .ProseMirror ul > li,
 .ProseMirror ol > li {
-	margin-top: 0.125rem;
-	margin-bottom: 0.125rem;
-	padding-top: 0;
-	padding-bottom: 0;
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .ProseMirror ul > li > p,
 .ProseMirror ol > li > p {
-	margin-top: 0;
-	margin-bottom: 0;
+  margin-top: 0;
+  margin-bottom: 0;
 }
