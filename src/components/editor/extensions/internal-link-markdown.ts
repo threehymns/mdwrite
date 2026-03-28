@@ -11,7 +11,9 @@ import {
 const INTERNAL_LINK_FLAG = "__mdwrite_internal_link";
 
 function addInternalLinkRule(md: MarkdownIt) {
+	// biome-ignore lint/suspicious/noExplicitAny: Need to attach custom flag to markdown-it instance
 	if ((md as any)[INTERNAL_LINK_FLAG]) return;
+	// biome-ignore lint/suspicious/noExplicitAny: Need to attach custom flag to markdown-it instance
 	(md as any)[INTERNAL_LINK_FLAG] = true;
 
 	const defaultValidateLink = md.validateLink;
@@ -26,6 +28,7 @@ function addInternalLinkRule(md: MarkdownIt) {
 		return defaultValidateLink(url);
 	};
 
+	// biome-ignore lint/suspicious/noExplicitAny: markdown-it state type is complex
 	const internalLink = (state: any, silent: boolean) => {
 		const src = state.src;
 		const pos = state.pos;

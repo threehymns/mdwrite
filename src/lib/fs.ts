@@ -1,6 +1,5 @@
 import { get, set } from "idb-keyval";
-import { type Searchable, extractTags, matchQuery } from "./search";
-import { type Frontmatter, parseFrontmatter, serializeFrontmatter } from "./markdown";
+import { extractTags, matchQuery, type Searchable } from "./search";
 
 const RECENT_FOLDER_KEY = "recent-folder-handle";
 
@@ -11,6 +10,7 @@ export interface FileNode {
 	children?: FileNode[];
 	relativePath: string;
 	parentHandle?: FileSystemDirectoryHandle;
+	// biome-ignore lint/suspicious/noExplicitAny: icon is a hugeicons component
 	icon?: any;
 }
 

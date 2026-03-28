@@ -82,8 +82,6 @@ export function serializeProperties(properties: Property[]): string {
 			case "number":
 				lines.push(`${key}: ${value}`);
 				break;
-			case "date":
-			case "text":
 			default:
 				lines.push(`${key}: '${value}'`);
 				break;
@@ -157,12 +155,12 @@ export function InlineFrontmatterEditor({
 	};
 
 	return (
-		<div className="border-b border-border bg-muted/20">
-			<div className="mx-auto flex max-w-3xl gap-1 flex-col px-4 py-2">
+		<div className="border-border border-b bg-muted/20">
+			<div className="mx-auto flex max-w-3xl flex-col gap-1 px-4 py-2">
 				{properties.map((prop, index) => (
 					<div
-						key={index}
-						className="flex items-center gap-2 rounded-md focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-border group"
+						key={prop.key || index}
+						className="group flex items-center gap-2 rounded-md focus-within:bg-muted/50 focus-within:ring-2 focus-within:ring-border"
 					>
 						<Select
 							value={prop.type}
@@ -172,21 +170,28 @@ export function InlineFrontmatterEditor({
 						>
 							<Tooltip>
 								<TooltipTrigger>
-									<SelectTrigger className="h-7 w-7 p-0 bg-transparent border-none [&_svg]:hidden" asChild>
-                    <Button className="[&_svg]:inline" variant="ghost" size="icon">
-										<HugeiconsIcon
-											icon={
-												prop.type === "text"
-													? InputCursorTextIcon
-													: prop.type === "number"
-														? BinaryCodeIcon
-														: prop.type === "checkbox"
-															? Tick02Icon
-															: Calendar02Icon
-											}
-											className="size-4 block"
-										/>
-                    </ Button>
+									<SelectTrigger
+										className="h-7 w-7 border-none bg-transparent p-0 [&_svg]:hidden"
+										asChild
+									>
+										<Button
+											className="[&_svg]:inline"
+											variant="ghost"
+											size="icon"
+										>
+											<HugeiconsIcon
+												icon={
+													prop.type === "text"
+														? InputCursorTextIcon
+														: prop.type === "number"
+															? BinaryCodeIcon
+															: prop.type === "checkbox"
+																? Tick02Icon
+																: Calendar02Icon
+												}
+												className="block size-4"
+											/>
+										</Button>
 									</SelectTrigger>
 								</TooltipTrigger>
 								<TooltipContent side="left">
@@ -289,7 +294,7 @@ export function InlineFrontmatterEditor({
 							type="button"
 							variant="ghost"
 							size="icon"
-              className="opacity-0 group-focus-within:opacity-100"
+							className="opacity-0 group-focus-within:opacity-100"
 							onClick={() => removeProperty(index)}
 						>
 							<HugeiconsIcon icon={Cancel01Icon} />

@@ -2,21 +2,19 @@ import {
 	Calendar03Icon,
 	Copy01Icon,
 	DatabaseIcon,
-	Delete01Icon,
 	Download03Icon,
 	File01Icon,
 	Image01Icon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { useEffect, useState } from "react";
-import type { FileNode } from "@/lib/fs";
-
 import {
 	ContextMenu,
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import type { FileNode } from "@/lib/fs";
 
 interface ImageTabProps {
 	file: FileNode;
@@ -360,6 +358,7 @@ function MetaItem({
 	label,
 	value,
 }: {
+	// biome-ignore lint/suspicious/noExplicitAny: icon is a hugeicons component
 	icon: any;
 	label: string;
 	value: string;

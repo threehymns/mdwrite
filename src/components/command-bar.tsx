@@ -55,7 +55,7 @@ export function CommandBar({ isOpen, onClose, actions }: CommandBarProps) {
 						>
 							{action.icon && (
 								<HugeiconsIcon
-									icon={action.icon as any}
+									icon={action.icon as never}
 									className="h-4 w-4 shrink-0 opacity-70"
 								/>
 							)}

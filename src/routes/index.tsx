@@ -1,6 +1,5 @@
 import {
 	FolderOpenIcon,
-	NeuralNetworkIcon,
 	PlusSignIcon,
 	Search01Icon,
 	SidebarLeft01Icon,
@@ -38,11 +37,7 @@ import {
 	writeFile,
 } from "@/lib/fs";
 import { parseInternalLinkMarkdown } from "@/lib/internal-links";
-import {
-	type Frontmatter,
-	parseFrontmatter,
-	serializeFrontmatter,
-} from "@/lib/markdown";
+import { parseFrontmatter } from "@/lib/markdown";
 import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/")({ component: App });
@@ -309,11 +304,16 @@ function App() {
 				// Restore tabs from localStorage
 				const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
 				const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
-				const showHiddenFilesOnInit = localStorage.getItem("showHiddenFiles") === "true";
+				const showHiddenFilesOnInit =
+					localStorage.getItem("showHiddenFiles") === "true";
 
 				if (savedTabs) {
 					try {
-						const tree = await getFileTree(storedHandle, "", showHiddenFilesOnInit);
+						const tree = await getFileTree(
+							storedHandle,
+							"",
+							showHiddenFilesOnInit,
+						);
 						const paths = JSON.parse(savedTabs) as string[];
 						const restoredTabs: FileNode[] = [];
 						for (const path of paths) {
@@ -525,7 +525,7 @@ function App() {
 			}, 100);
 		}
 		pendingAnchorRef.current = null;
-	}, [activePath, headings]);
+	}, [headings]);
 
 	const handleTabClose = (path: string) => {
 		setTabs((prev) => {
@@ -881,6 +881,7 @@ function App() {
 				id: "new-file",
 				title: "New File",
 				description: "Create a new markdown file",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: PlusSignIcon as any,
 				shortcut: shortcuts["new-file"],
 				perform: handleNewFile,
@@ -889,6 +890,7 @@ function App() {
 				id: "search",
 				title: "Search Content",
 				description: "Search in all markdown files",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: Search01Icon as any,
 				shortcut: shortcuts.search,
 				perform: handleSearchOpen,
@@ -897,6 +899,7 @@ function App() {
 				id: "command-bar",
 				title: "Command Bar",
 				description: "Open the command bar",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: ZapIcon as any,
 				shortcut: shortcuts["command-bar"],
 				perform: () => setIsCommandBarOpen(true),
@@ -905,6 +908,7 @@ function App() {
 				id: "graph-view",
 				title: "Graph View",
 				description: "Open graph view",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: Search01Icon as any,
 				perform: openGraphViewTab,
 			},
@@ -912,6 +916,7 @@ function App() {
 				id: "toggle-sidebar",
 				title: "Toggle Sidebar",
 				description: "Show or hide the file sidebar",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: SidebarLeft01Icon as any,
 				shortcut: shortcuts["toggle-sidebar"],
 				perform: () => setIsSidebarOpen((prev) => !prev),
@@ -920,6 +925,7 @@ function App() {
 				id: "open-folder",
 				title: "Open Folder",
 				description: "Open a different folder",
+				// biome-ignore lint/suspicious/noExplicitAny: icon type needs alignment
 				icon: FolderOpenIcon as any,
 				shortcut: shortcuts["open-folder"],
 				perform: handleOpenFolder,
@@ -934,17 +940,20 @@ function App() {
 		],
 	);
 
-	const handleDirectoryToggle = React.useCallback((path: string, isExpanded: boolean) => {
-		setExpandedPaths((prev) => {
-			const next = new Set(prev);
-			if (isExpanded) {
-				next.add(path);
-			} else {
-				next.delete(path);
-			}
-			return next;
-		});
-	}, []);
+	const handleDirectoryToggle = React.useCallback(
+		(path: string, isExpanded: boolean) => {
+			setExpandedPaths((prev) => {
+				const next = new Set(prev);
+				if (isExpanded) {
+					next.add(path);
+				} else {
+					next.delete(path);
+				}
+				return next;
+			});
+		},
+		[],
+	);
 
 	React.useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {

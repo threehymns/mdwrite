@@ -1,5 +1,6 @@
 import {
 	ArrowRight01Icon,
+	CheckListIcon,
 	CodeIcon,
 	Copy01Icon,
 	Delete01Icon,
@@ -7,8 +8,6 @@ import {
 	ExternalLink,
 	FilePasteIcon,
 	HeadingIcon,
-	Link01Icon,
-	ParagraphIcon,
 	QuotesIcon,
 	Scissor01Icon,
 	TextAlignLeftIcon,
@@ -16,7 +15,6 @@ import {
 	TextItalicIcon,
 	TextStrikethroughIcon,
 	TextUnderlineIcon,
-	CheckListIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
@@ -111,30 +109,30 @@ export function EditorContextMenu({
 					<>
 						<ContextMenuLabel>Link</ContextMenuLabel>
 						<ContextMenuItem
-							onClick={() => onLinkOpen?.(menuState.linkUrl!)}
+							onClick={() =>
+								// biome-ignore lint/style/noNonNullAssertion: URL is checked in condition
+								onLinkOpen?.(menuState.linkUrl!)
+							}
 						>
-							<HugeiconsIcon
-								icon={ExternalLink}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={ExternalLink} className="mr-2 h-3.5 w-3.5" />
 							<span>Open Link</span>
 						</ContextMenuItem>
 						<ContextMenuItem
-							onClick={() => onLinkCopy?.(menuState.linkUrl!)}
+							onClick={() =>
+								// biome-ignore lint/style/noNonNullAssertion: URL is checked in condition
+								onLinkCopy?.(menuState.linkUrl!)
+							}
 						>
-							<HugeiconsIcon
-								icon={Copy01Icon}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={Copy01Icon} className="mr-2 h-3.5 w-3.5" />
 							<span>Copy Link</span>
 						</ContextMenuItem>
 						<ContextMenuItem
-							onClick={() => onLinkEdit?.(menuState.linkUrl!)}
+							onClick={() =>
+								// biome-ignore lint/style/noNonNullAssertion: URL is checked in condition
+								onLinkEdit?.(menuState.linkUrl!)
+							}
 						>
-							<HugeiconsIcon
-								icon={Edit01Icon}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={Edit01Icon} className="mr-2 h-3.5 w-3.5" />
 							<span>Edit Link</span>
 						</ContextMenuItem>
 						<ContextMenuSeparator />
@@ -144,16 +142,19 @@ export function EditorContextMenu({
 					<>
 						<ContextMenuLabel>Image</ContextMenuLabel>
 						<ContextMenuItem
-							onClick={() => onImageCopy?.(menuState.imageSrc!)}
+							onClick={() =>
+								// biome-ignore lint/style/noNonNullAssertion: src is checked in condition
+								onImageCopy?.(menuState.imageSrc!)
+							}
 						>
-							<HugeiconsIcon
-								icon={Copy01Icon}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={Copy01Icon} className="mr-2 h-3.5 w-3.5" />
 							<span>Copy Image</span>
 						</ContextMenuItem>
 						<ContextMenuItem
-							onClick={() => onImageSaveAs?.(menuState.imageSrc!)}
+							onClick={() =>
+								// biome-ignore lint/style/noNonNullAssertion: src is checked in condition
+								onImageSaveAs?.(menuState.imageSrc!)
+							}
 						>
 							<HugeiconsIcon
 								icon={ArrowRight01Icon}
@@ -162,14 +163,8 @@ export function EditorContextMenu({
 							<span>Save Image As...</span>
 						</ContextMenuItem>
 						<ContextMenuSeparator />
-						<ContextMenuItem
-							variant="destructive"
-							onClick={onImageDelete}
-						>
-							<HugeiconsIcon
-								icon={Delete01Icon}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+						<ContextMenuItem variant="destructive" onClick={onImageDelete}>
+							<HugeiconsIcon icon={Delete01Icon} className="mr-2 h-3.5 w-3.5" />
 							<span>Delete Image</span>
 						</ContextMenuItem>
 						<ContextMenuSeparator />
@@ -178,10 +173,7 @@ export function EditorContextMenu({
 				{menuState.type === "editor" && (
 					<>
 						<ContextMenuItem onClick={handleCopy}>
-							<HugeiconsIcon
-								icon={Copy01Icon}
-								className="mr-2 h-3.5 w-3.5"
-							/>
+							<HugeiconsIcon icon={Copy01Icon} className="mr-2 h-3.5 w-3.5" />
 							<span>Copy</span>
 							<ContextMenuShortcut>Ctrl+C</ContextMenuShortcut>
 						</ContextMenuItem>

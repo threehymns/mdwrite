@@ -6,4 +6,3 @@ contextBridge.exposeInMainWorld("mdwrite", {
 	chrome: process.versions.chrome,
 	node: process.versions.node,
 });
-

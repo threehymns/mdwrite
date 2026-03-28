@@ -8,7 +8,7 @@
 @custom-variant dark (&:is(.dark *));
 
 .dark {
-  color-scheme: dark;
+	color-scheme: dark;
 }
 
 @theme inline {
@@ -68,53 +68,51 @@
 	}
 }
 
-
 @utility prose-shadcn {
-  /* Main text and headers */
-  --tw-prose-body: hsl(var(--foreground));
-  --tw-prose-headings: hsl(var(--foreground));
-  --tw-prose-lead: hsl(var(--muted-foreground));
-  --tw-prose-bold: hsl(var(--foreground));
-  
-  /* Interactive and Accents */
-  --tw-prose-links: hsl(var(--primary));
-  --tw-prose-counters: hsl(var(--muted-foreground));
-  --tw-prose-bullets: hsl(var(--primary) / 0.5);
-  
-  /* Borders and Dividers */
-  --tw-prose-hr: hsl(var(--border));
-  --tw-prose-quote-borders: hsl(var(--border));
-  --tw-prose-th-borders: hsl(var(--border));
-  --tw-prose-td-borders: hsl(var(--border));
+	/* Main text and headers */
+	--tw-prose-body: hsl(var(--foreground));
+	--tw-prose-headings: hsl(var(--foreground));
+	--tw-prose-lead: hsl(var(--muted-foreground));
+	--tw-prose-bold: hsl(var(--foreground));
 
-  /* Quotes and Captions */
-  --tw-prose-quotes: hsl(var(--foreground));
-  --tw-prose-captions: hsl(var(--muted-foreground));
+	/* Interactive and Accents */
+	--tw-prose-links: hsl(var(--primary));
+	--tw-prose-counters: hsl(var(--muted-foreground));
+	--tw-prose-bullets: hsl(var(--primary) / 0.5);
 
-  /* Code Blocks */
-  --tw-prose-code: hsl(var(--foreground) / 0.9);
-  --tw-prose-pre-code: hsl(var(--secondary-foreground));
-  --tw-prose-pre-bg: hsl(var(--secondary));
+	/* Borders and Dividers */
+	--tw-prose-hr: hsl(var(--border));
+	--tw-prose-quote-borders: hsl(var(--border));
+	--tw-prose-th-borders: hsl(var(--border));
+	--tw-prose-td-borders: hsl(var(--border));
 
-  /* Inverted/Dark mode styles */
-  --tw-prose-invert-body: hsl(var(--foreground) / 0.8);
-  --tw-prose-invert-headings: hsl(var(--foreground));
-  --tw-prose-invert-lead: hsl(var(--muted-foreground));
-  --tw-prose-invert-links: hsl(var(--primary));
-  --tw-prose-invert-bold: hsl(var(--foreground));
-  --tw-prose-invert-counters: hsl(var(--muted-foreground));
-  --tw-prose-invert-bullets: hsl(var(--primary) / 0.6);
-  --tw-prose-invert-hr: hsl(var(--border));
-  --tw-prose-invert-quotes: hsl(var(--foreground));
-  --tw-prose-invert-quote-borders: hsl(var(--border));
-  --tw-prose-invert-captions: hsl(var(--muted-foreground));
-  --tw-prose-invert-code: hsl(var(--foreground) / 0.9);
-  --tw-prose-invert-pre-code: hsl(var(--secondary-foreground));
-  --tw-prose-invert-pre-bg: hsl(var(--secondary));
-  --tw-prose-invert-th-borders: hsl(var(--border));
-  --tw-prose-invert-td-borders: hsl(var(--border));
+	/* Quotes and Captions */
+	--tw-prose-quotes: hsl(var(--foreground));
+	--tw-prose-captions: hsl(var(--muted-foreground));
+
+	/* Code Blocks */
+	--tw-prose-code: hsl(var(--foreground) / 0.9);
+	--tw-prose-pre-code: hsl(var(--secondary-foreground));
+	--tw-prose-pre-bg: hsl(var(--secondary));
+
+	/* Inverted/Dark mode styles */
+	--tw-prose-invert-body: hsl(var(--foreground) / 0.8);
+	--tw-prose-invert-headings: hsl(var(--foreground));
+	--tw-prose-invert-lead: hsl(var(--muted-foreground));
+	--tw-prose-invert-links: hsl(var(--primary));
+	--tw-prose-invert-bold: hsl(var(--foreground));
+	--tw-prose-invert-counters: hsl(var(--muted-foreground));
+	--tw-prose-invert-bullets: hsl(var(--primary) / 0.6);
+	--tw-prose-invert-hr: hsl(var(--border));
+	--tw-prose-invert-quotes: hsl(var(--foreground));
+	--tw-prose-invert-quote-borders: hsl(var(--border));
+	--tw-prose-invert-captions: hsl(var(--muted-foreground));
+	--tw-prose-invert-code: hsl(var(--foreground) / 0.9);
+	--tw-prose-invert-pre-code: hsl(var(--secondary-foreground));
+	--tw-prose-invert-pre-bg: hsl(var(--secondary));
+	--tw-prose-invert-th-borders: hsl(var(--border));
+	--tw-prose-invert-td-borders: hsl(var(--border));
 }
-
 
 /* Experimental stylable select element for language selection */
 .language-select {
@@ -312,12 +310,12 @@
 /* Bullet point styling - slightly transparent */
 .ProseMirror ul > li::marker,
 .ProseMirror ul > li::before {
-	color: color-mix(in oklab, var(--primary), transparent 50%) !important;
+	color: color-mix(in oklab, var(--primary), transparent 50%);
 }
 
 .ProseMirror ol > li::marker,
 .ProseMirror ol > li::before {
-	color: color-mix(in oklab, var(--muted-foreground), transparent 30%) !important;
+	color: color-mix(in oklab, var(--muted-foreground), transparent 30%);
 }
 
 /* Dark mode bullet styling */
@@ -325,14 +323,14 @@
 .dark .ProseMirror ul > li::before,
 .ProseMirror.dark ul > li::marker,
 .ProseMirror.dark ul > li::before {
-	color: color-mix(in oklab, var(--primary), transparent 40%) !important;
+	color: color-mix(in oklab, var(--primary), transparent 40%);
 }
 
 .dark .ProseMirror ol > li::marker,
 .dark .ProseMirror ol > li::before,
 .ProseMirror.dark ol > li::marker,
 .ProseMirror.dark ol > li::before {
-	color: color-mix(in oklab, var(--muted-foreground), transparent 20%) !important;
+	color: color-mix(in oklab, var(--muted-foreground), transparent 20%);
 }
 
 /* Tighten list item spacing */

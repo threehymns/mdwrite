@@ -139,7 +139,9 @@ async function createMainWindow() {
 	}
 
 	const distIndex = firstExistingPath([
-		app.isPackaged ? path.join(process.resourcesPath, "dist", "index.html") : null,
+		app.isPackaged
+			? path.join(process.resourcesPath, "dist", "index.html")
+			: null,
 		path.join(process.cwd(), "dist", "index.html"),
 		path.join(process.cwd(), "dist", "client", "index.html"),
 		path.join(app.getAppPath(), "dist", "index.html"),

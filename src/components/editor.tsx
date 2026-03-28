@@ -8,23 +8,23 @@ import Link, { isAllowedUri } from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskItem from "@tiptap/extension-task-item";
 import TaskList from "@tiptap/extension-task-list";
+import Underline from "@tiptap/extension-underline";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Underline from "@tiptap/extension-underline";
 import * as React from "react";
 import { Markdown } from "tiptap-markdown";
 import {
 	parseInternalLinkHref,
 	serializeInternalLinkMarkdown,
 } from "@/lib/internal-links";
-import { CodeBlockCodeMirror } from "./editor/extensions/code-block-codemirror";
-import { ImageWithResolver } from "./editor/extensions/image-with-resolver";
-import { InternalLinkMarkdown } from "./editor/extensions/internal-link-markdown";
-import { SlashCommand, suggestion } from "./editor/extensions/slash-command";
 import {
 	EditorContextMenu,
 	type EditorContextMenuState,
 } from "./editor/editor-context-menu";
+import { CodeBlockCodeMirror } from "./editor/extensions/code-block-codemirror";
+import { ImageWithResolver } from "./editor/extensions/image-with-resolver";
+import { InternalLinkMarkdown } from "./editor/extensions/internal-link-markdown";
+import { SlashCommand, suggestion } from "./editor/extensions/slash-command";
 
 const TaskListInputRule = Extension.create({
 	name: "taskListInputRule",
@@ -33,6 +33,7 @@ const TaskListInputRule = Extension.create({
 			// Handle the case where we type "- [ ] " or "- [x] " on a new line
 			new InputRule({
 				find: /^\s*([-+*])\s+\[( |x)\]\s$/,
+				// biome-ignore lint/suspicious/noExplicitAny: Tiptap InputRule handler typing is complex
 				handler: ({ range, match, chain }: any) => {
 					const start = range.from;
 					const end = range.to;
@@ -50,6 +51,7 @@ const TaskListInputRule = Extension.create({
 			// Handle the case where we're already in a bullet list and type "[ ] " or "[x] "
 			new InputRule({
 				find: /^\[( |x)\]\s$/,
+				// biome-ignore lint/suspicious/noExplicitAny: Tiptap InputRule handler typing is complex
 				handler: ({ range, match, chain }: any) => {
 					const start = range.from;
 					const end = range.to;
@@ -567,9 +569,7 @@ function EditorComponent({
 			.then((res) => res.blob())
 			.then((blob) => {
 				try {
-					navigator.clipboard.write([
-						new ClipboardItem({ [blob.type]: blob }),
-					]);
+					navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
 				} catch {
 					// Fallback to copying the URL
 					navigator.clipboard.writeText(src);

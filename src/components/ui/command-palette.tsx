@@ -42,7 +42,7 @@ export function CommandPalette({
 				/>
 				<Dialog.Popup
 					className={cn(
-						"-translate-x-1/2 fixed top-[20%] left-1/2 z-50 w-full max-w-xl overflow-hidden rounded-xl border bg-popover shadow-2xl",
+						"fixed top-[20%] left-1/2 z-50 w-full max-w-xl -translate-x-1/2 overflow-hidden rounded-xl border bg-popover shadow-2xl",
 						"data-[open]:fade-in-0 data-[closed]:fade-out-0 data-[open]:zoom-in-95 data-[closed]:zoom-out-95 data-[closed]:animate-out data-[open]:animate-in",
 					)}
 				>

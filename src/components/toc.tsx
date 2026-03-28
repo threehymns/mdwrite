@@ -1,12 +1,11 @@
 import * as React from "react";
-import { cn } from "@/lib/utils";
-
 import {
 	ContextMenu,
 	ContextMenuContent,
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { cn } from "@/lib/utils";
 
 interface Heading {
 	level: number;
@@ -97,9 +96,7 @@ export function TableOfContents({
 								</button>
 							</ContextMenuTrigger>
 							<ContextMenuContent>
-								<ContextMenuItem
-									onClick={() => onHeadingClick(heading.index)}
-								>
+								<ContextMenuItem onClick={() => onHeadingClick(heading.index)}>
 									<span>Go to heading</span>
 								</ContextMenuItem>
 								<ContextMenuItem
@@ -111,7 +108,7 @@ export function TableOfContents({
 								</ContextMenuItem>
 								<ContextMenuItem
 									onClick={() => {
-										const markdown = "#".repeat(heading.level) + " ";
+										const markdown = `${"#".repeat(heading.level)} `;
 										navigator.clipboard.writeText(markdown + heading.text);
 									}}
 								>

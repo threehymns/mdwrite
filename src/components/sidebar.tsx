@@ -334,7 +334,7 @@ function FileTree({
 								onDrop={handleFileDropWrapper}
 							>
 								{isDropPositionBefore && (
-									<div className="absolute -top-px left-0 right-0 h-0.5 bg-primary" />
+									<div className="absolute -top-px right-0 left-0 h-0.5 bg-primary" />
 								)}
 								<FileTreeNode
 									node={node}
@@ -355,7 +355,7 @@ function FileTree({
 									onDirectoryToggle={onDirectoryToggle}
 								/>
 								{isDropPositionAfter && (
-									<div className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary" />
+									<div className="absolute right-0 -bottom-px left-0 h-0.5 bg-primary" />
 								)}
 							</div>
 						) : (
@@ -543,7 +543,8 @@ function FileTreeNodeComponent({
 	expandedPaths,
 	onDirectoryToggle,
 }: FileTreeNodeProps) {
-	const isControlled = expandedPaths !== undefined && onDirectoryToggle !== undefined;
+	const isControlled =
+		expandedPaths !== undefined && onDirectoryToggle !== undefined;
 	const isExpanded = isControlled
 		? expandedPaths.has(node.relativePath)
 		: false;
@@ -614,6 +615,7 @@ function FileTreeNodeComponent({
 
 	const isDropTarget = dropTargetPath === node.relativePath;
 
+	// biome-ignore lint/a11y/useSemanticElements: semantic element with custom styling
 	// eslint-disable-next-line jsx-a11y/no-static-element-interactions
 	const nodeContent = (
 		<div

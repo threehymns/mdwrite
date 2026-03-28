@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 export const ImageNodeView = (props: NodeViewProps) => {
 	const { node, extension } = props;
 	const [src, setSrc] = useState<string>(node.attrs.src);
+	// biome-ignore lint/suspicious/noExplicitAny: Tipap extension options typing is incomplete
 	const resolveImagePath = (extension.options as any).resolveImagePath;
 
 	useEffect(() => {

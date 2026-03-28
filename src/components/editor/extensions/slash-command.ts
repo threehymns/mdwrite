@@ -39,6 +39,7 @@ export const SlashCommand = Extension.create({
 					range: Range;
 					props: { command: (item: SuggestionItem) => void };
 				}) => {
+					// biome-ignore lint/suspicious/noExplicitAny: Tippap SuggestionProps typing mismatch
 					props.command({ editor, range } as any);
 				},
 			},
@@ -247,6 +248,7 @@ export const suggestion = {
 			onStart: (props: SuggestionProps) => {
 				editor = props.editor;
 				initialRange = props.range;
+				// biome-ignore lint/suspicious/noExplicitAny: Tippap ReactRenderer typing mismatch
 				component = new ReactRenderer(SlashCommandList as any, {
 					props,
 					editor: props.editor,
@@ -257,6 +259,7 @@ export const suggestion = {
 				}
 
 				popup = tippy("body", {
+					// biome-ignore lint/suspicious/noExplicitAny: tippy.js rect function typing
 					getReferenceClientRect: props.clientRect as any,
 					appendTo: () => document.body,
 					content: component.element,
@@ -275,6 +278,7 @@ export const suggestion = {
 				}
 
 				popup[0].setProps({
+					// biome-ignore lint/suspicious/noExplicitAny: tippy.js rect function typing
 					getReferenceClientRect: props.clientRect as any,
 				});
 			},

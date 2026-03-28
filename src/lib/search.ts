@@ -50,7 +50,7 @@ export function matchQuery(query: string, item: Searchable): boolean {
 				regex.test(item.label) ||
 				(item.path ? regex.test(item.path) : false) ||
 				(item.content ? regex.test(item.content) : false);
-		} catch (e) {
+		} catch (_e) {
 			matches = false;
 		}
 	} else if (term.startsWith("path:")) {

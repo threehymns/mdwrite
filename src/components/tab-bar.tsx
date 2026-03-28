@@ -1,9 +1,10 @@
-import { Cancel01Icon, Copy01Icon, File01Icon } from "@hugeicons/core-free-icons";
+import {
+	Cancel01Icon,
+	Copy01Icon,
+	File01Icon,
+} from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
-import type { FileNode } from "@/lib/fs";
-import { cn } from "@/lib/utils";
-
 import {
 	ContextMenu,
 	ContextMenuContent,
@@ -11,6 +12,8 @@ import {
 	ContextMenuSeparator,
 	ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import type { FileNode } from "@/lib/fs";
+import { cn } from "@/lib/utils";
 
 interface TabBarProps {
 	tabs: FileNode[];
@@ -116,7 +119,7 @@ export function TabBar({
 						draggedIndex !== index + 1;
 
 					return (
-						<ContextMenu>
+						<ContextMenu key={tab.relativePath}>
 							<ContextMenuTrigger asChild>
 								<div
 									key={tab.relativePath}
@@ -142,10 +145,10 @@ export function TabBar({
 									}}
 								>
 									{showLeftIndicator && (
-										<div className="-left-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
+										<div className="pointer-events-none absolute top-1 bottom-1 -left-[1.5px] z-50 w-0.5 rounded-full bg-primary" />
 									)}
 									{showRightIndicator && (
-										<div className="-right-[1.5px] pointer-events-none absolute top-1 bottom-1 z-50 w-0.5 rounded-full bg-primary" />
+										<div className="pointer-events-none absolute top-1 -right-[1.5px] bottom-1 z-50 w-0.5 rounded-full bg-primary" />
 									)}
 									<div className="flex w-full items-center gap-2">
 										<HugeiconsIcon

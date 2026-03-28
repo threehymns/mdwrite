@@ -13,6 +13,7 @@ export const ImageWithResolver = Image.extend<ImageWithResolverOptions>({
 		return {
 			...this.parent?.(),
 			resolveImagePath: undefined,
+			// biome-ignore lint/suspicious/noExplicitAny: Parent options typing is complex
 		} as any;
 	},
 
@@ -35,8 +36,7 @@ export const ImageWithResolver = Image.extend<ImageWithResolverOptions>({
 				serialize(state, node) {
 					if (node.attrs.internalLink) {
 						const alt = node.attrs.alt?.trim();
-						const needsAlias =
-							alt && alt.length > 0 && alt !== node.attrs.src;
+						const needsAlias = alt && alt.length > 0 && alt !== node.attrs.src;
 						const inner = needsAlias
 							? `${node.attrs.src}|${alt}`
 							: node.attrs.src;
