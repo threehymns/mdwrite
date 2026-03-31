@@ -24,16 +24,28 @@ import { TabBar } from "@/components/tab-bar";
 import { useTheme } from "@/components/theme-provider";
 import { TableOfContents } from "@/components/toc";
 import { Button } from "@/components/ui/button";
+import {
+  Command,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { Action } from "@/lib/actions";
 import {
   type FileNode,
   getFileHandleByPath,
   getFileTree,
-  getRecentFolder,
+  getRecentFolders,
   getStoredHandle,
   readFile,
   requestPermission,
-  saveRecentFolder,
+  saveRecentFolders,
   writeFile,
 } from "@/lib/fs";
 import { parseInternalLinkMarkdown } from "@/lib/internal-links";
@@ -42,12 +54,17 @@ import { useKeyboardShortcuts } from "@/lib/shortcuts";
 
 export const Route = createFileRoute("/")({ component: App });
 
-const TABS_STORAGE_KEY = "mdwrite-tabs";
-const ACTIVE_PATH_STORAGE_KEY = "mdwrite-active-path";
-const SIDEBAR_OPEN_STORAGE_KEY = "mdwrite-sidebar-open";
-const SIDEBAR_EXPANDED_PATHS_KEY = "mdwrite-sidebar-expanded-paths";
+const TABS_STORAGE_KEY_BASE = "mdwrite-tabs";
+const ACTIVE_PATH_STORAGE_KEY_BASE = "mdwrite-active-path";
+const SIDEBAR_OPEN_STORAGE_KEY_BASE = "mdwrite-sidebar-open";
+const SIDEBAR_EXPANDED_PATHS_KEY_BASE = "mdwrite-sidebar-expanded-paths";
 const CONTENT_STATE_SYNC_DELAY_MS = 180;
 const GRAPH_TAB_PATH = "__graph_view__";
+
+function getStorageKey(baseKey: string, folderName: string | null): string {
+  if (!folderName) return baseKey;
+  return `${baseKey}-${folderName}`;
+}
 
 function findNodeByPath(nodes: FileNode[], path: string): FileNode | null {
   for (const node of nodes) {
@@ -79,6 +96,12 @@ function normalizePath(path: string): string {
   return result.join("/");
 }
 
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"];
+
+function isImageFile(name: string): boolean {
+  return IMAGE_EXTENSIONS.some((ext) => name.toLowerCase().endsWith(ext));
+}
+
 function createGraphTabNode(handle: FileSystemHandle): FileNode {
   return {
     name: "Graph View",
@@ -88,35 +111,107 @@ function createGraphTabNode(handle: FileSystemHandle): FileNode {
   };
 }
 
+async function loadFileContent(
+  handle: FileSystemFileHandle,
+  lastModifiedRef: React.MutableRefObject<number>,
+  setProperties: (props: Property[]) => void,
+  setContent: (content: string) => void,
+) {
+  const { content: text, lastModified } = await readFile(handle);
+  lastModifiedRef.current = lastModified;
+  const { frontmatter: fm, hasFrontmatter, body } = parseFrontmatter(text);
+  setProperties(hasFrontmatter ? frontmatterToProperties(fm) : []);
+  setContent(parseInternalLinkMarkdown(hasFrontmatter ? body : text));
+}
+
+interface FolderSwitcherProps {
+  currentRoot: FileSystemDirectoryHandle | null;
+  onFolderSelect: (handle: FileSystemDirectoryHandle) => Promise<void>;
+  onOpenFolder: () => void;
+  isOpen: boolean;
+}
+
+function FolderSwitcher({
+  currentRoot,
+  onFolderSelect,
+  onOpenFolder,
+  isOpen,
+}: FolderSwitcherProps) {
+  const [recentFolders, setRecentFolders] = React.useState<
+    FileSystemDirectoryHandle[]
+  >([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const loadRecentFolders = async () => {
+      setIsLoading(true);
+      const folders = await getRecentFolders();
+      setRecentFolders(folders ?? []);
+      setIsLoading(false);
+    };
+    void loadRecentFolders();
+  }, [isOpen]);
+
+  const handleFolderSelect = async (handle: FileSystemDirectoryHandle) => {
+    const granted = await requestPermission(handle);
+    if (granted) {
+      await onFolderSelect(handle);
+    }
+  };
+
+  const availableRecents = recentFolders.filter(
+    (folder) => !currentRoot || folder.name !== currentRoot.name,
+  );
+
+  return (
+    <Command>
+      <CommandInput placeholder="Filter" />
+      <CommandList className="mt-1">
+        {isLoading ? (
+          <div className="px-3 py-2 text-muted-foreground text-sm">
+            Loading...
+          </div>
+        ) : (
+          <>
+            {availableRecents.map((folder) => (
+              <CommandItem
+                key={folder.name}
+                onSelect={() => void handleFolderSelect(folder)}
+                className="cursor-pointer truncate"
+              >
+                {folder.name}
+              </CommandItem>
+            ))}
+            {availableRecents.length > 0 && <CommandSeparator />}
+            <CommandItem
+              onSelect={onOpenFolder}
+              className="cursor-pointer text-muted-foreground"
+            >
+              Open folder...
+            </CommandItem>
+          </>
+        )}
+      </CommandList>
+    </Command>
+  );
+}
+
 function App() {
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(SIDEBAR_OPEN_STORAGE_KEY);
-      return saved !== null ? saved === "true" : true;
-    }
-    return false;
-  });
-  const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(SIDEBAR_EXPANDED_PATHS_KEY);
-      if (saved) {
-        try {
-          return new Set(JSON.parse(saved));
-        } catch {
-          return new Set();
-        }
-      }
-    }
-    return new Set();
-  });
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [expandedPaths, setExpandedPaths] = React.useState<Set<string>>(
+    new Set(),
+  );
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
   const [isCommandBarOpen, setIsCommandBarOpen] = React.useState(false);
+  const [isFolderSwitcherOpen, setIsFolderSwitcherOpen] = React.useState(false);
   const { showHiddenFiles } = useTheme();
   const { shortcuts } = useKeyboardShortcuts();
   const shortcutsRef = React.useRef(shortcuts);
   React.useEffect(() => {
     shortcutsRef.current = shortcuts;
   }, [shortcuts]);
+  const isSwitchingFolderRef = React.useRef(false);
   const [rootHandle, setRootHandle] =
     React.useState<FileSystemDirectoryHandle | null>(null);
   const [storedHandle, setStoredHandle] =
@@ -136,6 +231,13 @@ function App() {
   const pendingContentRef = React.useRef<string | null>(null);
   const pendingContentPathRef = React.useRef<string | null>(null);
   const editorRef = React.useRef<EditorHandle>(null);
+  const tabsRef = React.useRef<FileNode[]>(tabs);
+  const rootHandleRef = React.useRef<FileSystemDirectoryHandle | null>(
+    rootHandle,
+  );
+  const isSidebarOpenRef = React.useRef<boolean>(isSidebarOpen);
+  const expandedPathsRef = React.useRef<Set<string>>(expandedPaths);
+  const loadGenerationRef = React.useRef(0);
 
   React.useEffect(() => {
     contentRef.current = content;
@@ -144,6 +246,22 @@ function App() {
   React.useEffect(() => {
     activePathRef.current = activePath;
   }, [activePath]);
+
+  React.useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  React.useEffect(() => {
+    rootHandleRef.current = rootHandle;
+  }, [rootHandle]);
+
+  React.useEffect(() => {
+    isSidebarOpenRef.current = isSidebarOpen;
+  }, [isSidebarOpen]);
+
+  React.useEffect(() => {
+    expandedPathsRef.current = expandedPaths;
+  }, [expandedPaths]);
 
   const cancelPendingContentSync = React.useCallback(() => {
     if (contentSyncTimeoutRef.current !== null) {
@@ -272,22 +390,28 @@ function App() {
 
   const handleNewFileRef = React.useRef<() => void>(() => {});
   const handleOpenFolderRef = React.useRef<() => void>(() => {});
+  const saveCurrentFolderStateRef = React.useRef<() => void>(() => {});
 
   const handleOpenFolder = React.useCallback(async () => {
     try {
+      saveCurrentFolderStateRef.current();
+      isSwitchingFolderRef.current = true;
       const handle = await (
         window as unknown as {
           showDirectoryPicker(): Promise<FileSystemDirectoryHandle>;
         }
       ).showDirectoryPicker();
       setRootHandle(handle);
-      await saveRecentFolder(handle);
-      await refreshFiles(handle);
-      setIsSidebarOpen(true);
+      const folders = (await getRecentFolders()) ?? [];
+      // Remove if already in list, then prepend so newest is first
+      const filtered = folders.filter((f) => f.name !== handle.name);
+      filtered.unshift(handle);
+      await saveRecentFolders(filtered);
     } catch (err) {
+      isSwitchingFolderRef.current = false;
       console.error("Failed to open folder", err);
     }
-  }, [refreshFiles]);
+  }, []);
 
   React.useEffect(() => {
     handleOpenFolderRef.current = handleOpenFolder;
@@ -297,69 +421,13 @@ function App() {
     if (storedHandle) {
       const granted = await requestPermission(storedHandle);
       if (granted) {
+        saveCurrentFolderStateRef.current();
+        isSwitchingFolderRef.current = true;
         setRootHandle(storedHandle);
-        await refreshFiles(storedHandle);
-        setIsSidebarOpen(true);
-
-        // Restore tabs from localStorage
-        const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
-        const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
-        const showHiddenFilesOnInit =
-          localStorage.getItem("showHiddenFiles") === "true";
-
-        if (savedTabs) {
-          try {
-            const tree = await getFileTree(
-              storedHandle,
-              "",
-              showHiddenFilesOnInit,
-            );
-            const paths = JSON.parse(savedTabs) as string[];
-            const restoredTabs: FileNode[] = [];
-            for (const path of paths) {
-              if (path === GRAPH_TAB_PATH) {
-                restoredTabs.push(createGraphTabNode(storedHandle));
-                continue;
-              }
-              const node = findNodeByPath(tree, path);
-              if (node) restoredTabs.push(node);
-            }
-            setTabs(restoredTabs);
-
-            if (savedActive) {
-              const activeNode = restoredTabs.find(
-                (t) => t.relativePath === savedActive,
-              );
-              if (activeNode) {
-                setActivePath(activeNode.relativePath);
-                if (activeNode.relativePath === GRAPH_TAB_PATH) {
-                  setContentImmediate("");
-                  setProperties([]);
-                } else {
-                  const { content: text, lastModified } = await readFile(
-                    activeNode.handle as FileSystemFileHandle,
-                  );
-                  lastModifiedRef.current = lastModified;
-                  const {
-                    frontmatter: fm,
-                    hasFrontmatter,
-                    body,
-                  } = parseFrontmatter(text);
-                  const props = hasFrontmatter
-                    ? frontmatterToProperties(fm)
-                    : [];
-                  setProperties(props);
-                  const processed = parseInternalLinkMarkdown(
-                    hasFrontmatter ? body : text,
-                  );
-                  setContentImmediate(processed);
-                }
-              }
-            }
-          } catch (e) {
-            console.error("Failed to restore tabs", e);
-          }
-        }
+        const folders = (await getRecentFolders()) ?? [];
+        const filtered = folders.filter((f) => f.name !== storedHandle.name);
+        filtered.unshift(storedHandle);
+        await saveRecentFolders(filtered);
       }
     }
   };
@@ -382,48 +450,36 @@ function App() {
 
   const handleFileSelect = React.useCallback(
     async (file: FileNode) => {
-      if (file.kind === "file") {
-        if (file.relativePath === GRAPH_TAB_PATH) {
-          setTabs((prev) => {
-            if (prev.some((tab) => tab.relativePath === GRAPH_TAB_PATH)) {
-              return prev;
-            }
-            return [...prev, file];
-          });
-          setActivePath(GRAPH_TAB_PATH);
-          return;
-        }
+      if (file.kind !== "file") return;
 
-        cancelPendingContentSync();
-        const isImage = [".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp"].some(
-          (ext) => file.name.toLowerCase().endsWith(ext),
-        );
-
+      if (file.relativePath === GRAPH_TAB_PATH) {
         setTabs((prev) => {
-          if (prev.some((t) => t.relativePath === file.relativePath)) {
+          if (prev.some((tab) => tab.relativePath === GRAPH_TAB_PATH)) {
             return prev;
           }
           return [...prev, file];
         });
-        setActivePath(file.relativePath);
+        setActivePath(GRAPH_TAB_PATH);
+        return;
+      }
 
-        if (!isImage) {
-          const { content: text, lastModified } = await readFile(
-            file.handle as FileSystemFileHandle,
-          );
-          lastModifiedRef.current = lastModified;
-          const {
-            frontmatter: fm,
-            hasFrontmatter,
-            body,
-          } = parseFrontmatter(text);
-          const props = hasFrontmatter ? frontmatterToProperties(fm) : [];
-          setProperties(props);
-          const processed = parseInternalLinkMarkdown(
-            hasFrontmatter ? body : text,
-          );
-          setContentImmediate(processed);
+      cancelPendingContentSync();
+
+      setTabs((prev) => {
+        if (prev.some((t) => t.relativePath === file.relativePath)) {
+          return prev;
         }
+        return [...prev, file];
+      });
+      setActivePath(file.relativePath);
+
+      if (!isImageFile(file.name)) {
+        await loadFileContent(
+          file.handle as FileSystemFileHandle,
+          lastModifiedRef,
+          setProperties,
+          setContentImmediate,
+        );
       }
     },
     [cancelPendingContentSync, setContentImmediate],
@@ -544,22 +600,31 @@ function App() {
   };
 
   const handleTabsCloseOther = (keepPath: string) => {
-    setTabs((prev) => {
-      const keepTab = prev.find((t) => t.relativePath === keepPath);
-      if (!keepTab) return prev;
-      setActivePath(keepPath);
+    const keepTab = tabs.find((t) => t.relativePath === keepPath);
+    if (!keepTab) return;
+    const activeWasClosed = activePath !== keepPath;
+    setTabs([keepTab]);
+    setActivePath(keepPath);
+    if (activeWasClosed) {
       handleFileSelect(keepTab);
-      return [keepTab];
-    });
+    }
   };
 
   const handleTabsCloseToRight = (fromPath: string) => {
-    setTabs((prev) => {
-      const fromIndex = prev.findIndex((t) => t.relativePath === fromPath);
-      if (fromIndex === -1) return prev;
-      const newTabs = prev.slice(0, fromIndex + 1);
-      return newTabs;
-    });
+    const fromIndex = tabs.findIndex((t) => t.relativePath === fromPath);
+    if (fromIndex === -1) return;
+    const activeInClosedRange =
+      activePath !== null &&
+      tabs.findIndex(
+        (t, i) => t.relativePath === activePath && i > fromIndex,
+      ) !== -1;
+    const newTabs = tabs.slice(0, fromIndex + 1);
+    setTabs(newTabs);
+    if (activeInClosedRange && newTabs.length > 0) {
+      const nextTab = newTabs[newTabs.length - 1];
+      setActivePath(nextTab.relativePath);
+      handleFileSelect(nextTab);
+    }
   };
 
   const handleCopyFilePath = (path: string) => {
@@ -937,6 +1002,8 @@ function App() {
       handleSearchOpen,
       openGraphViewTab,
       shortcuts,
+      setIsCommandBarOpen,
+      setIsSidebarOpen,
     ],
   );
 
@@ -1001,95 +1068,181 @@ function App() {
 
   // Save state to localStorage
   React.useEffect(() => {
-    localStorage.setItem(SIDEBAR_OPEN_STORAGE_KEY, String(isSidebarOpen));
-  }, [isSidebarOpen]);
+    if (!rootHandle || isSwitchingFolderRef.current) return;
+    localStorage.setItem(
+      getStorageKey(SIDEBAR_OPEN_STORAGE_KEY_BASE, rootHandle.name),
+      String(isSidebarOpen),
+    );
+  }, [isSidebarOpen, rootHandle]);
 
   React.useEffect(() => {
+    if (!rootHandle || isSwitchingFolderRef.current) return;
     localStorage.setItem(
-      SIDEBAR_EXPANDED_PATHS_KEY,
+      getStorageKey(SIDEBAR_EXPANDED_PATHS_KEY_BASE, rootHandle.name),
       JSON.stringify([...expandedPaths]),
     );
-  }, [expandedPaths]);
+  }, [expandedPaths, rootHandle]);
 
   React.useEffect(() => {
+    if (!rootHandle || isSwitchingFolderRef.current) return;
     localStorage.setItem(
-      TABS_STORAGE_KEY,
+      getStorageKey(TABS_STORAGE_KEY_BASE, rootHandle.name),
       JSON.stringify(tabs.map((t) => t.relativePath)),
     );
-  }, [tabs]);
+  }, [tabs, rootHandle]);
 
   React.useEffect(() => {
-    if (activePath) {
-      localStorage.setItem(ACTIVE_PATH_STORAGE_KEY, activePath);
-    }
-  }, [activePath]);
+    if (!rootHandle || !activePath || isSwitchingFolderRef.current) return;
+    localStorage.setItem(
+      getStorageKey(ACTIVE_PATH_STORAGE_KEY_BASE, rootHandle.name),
+      activePath,
+    );
+  }, [activePath, rootHandle]);
 
+  const saveCurrentFolderState = React.useCallback(() => {
+    if (!rootHandleRef.current) return;
+    localStorage.setItem(
+      getStorageKey(TABS_STORAGE_KEY_BASE, rootHandleRef.current.name),
+      JSON.stringify(tabsRef.current.map((t: FileNode) => t.relativePath)),
+    );
+    if (activePathRef.current) {
+      localStorage.setItem(
+        getStorageKey(ACTIVE_PATH_STORAGE_KEY_BASE, rootHandleRef.current.name),
+        activePathRef.current,
+      );
+    }
+    localStorage.setItem(
+      getStorageKey(SIDEBAR_OPEN_STORAGE_KEY_BASE, rootHandleRef.current.name),
+      String(isSidebarOpenRef.current),
+    );
+    localStorage.setItem(
+      getStorageKey(
+        SIDEBAR_EXPANDED_PATHS_KEY_BASE,
+        rootHandleRef.current.name,
+      ),
+      JSON.stringify([...expandedPathsRef.current]),
+    );
+  }, []);
+
+  React.useEffect(() => {
+    saveCurrentFolderStateRef.current = saveCurrentFolderState;
+  }, [saveCurrentFolderState]);
+
+  // Load folder-specific state when rootHandle changes
   React.useEffect(() => {
     if (!rootHandle) return;
-    void refreshFiles(rootHandle);
-  }, [rootHandle, refreshFiles]);
 
+    const generation = ++loadGenerationRef.current;
+
+    const loadFolderState = async () => {
+      try {
+        const folderName = rootHandle.name;
+        const getKey = (base: string) => getStorageKey(base, folderName);
+
+        // Restore sidebar state
+        const savedSidebarOpen = localStorage.getItem(
+          getKey(SIDEBAR_OPEN_STORAGE_KEY_BASE),
+        );
+        setIsSidebarOpen(
+          savedSidebarOpen !== null ? savedSidebarOpen === "true" : true,
+        );
+
+        // Restore expanded paths
+        const savedExpandedPaths = localStorage.getItem(
+          getKey(SIDEBAR_EXPANDED_PATHS_KEY_BASE),
+        );
+        try {
+          setExpandedPaths(
+            savedExpandedPaths
+              ? new Set(JSON.parse(savedExpandedPaths))
+              : new Set(),
+          );
+        } catch {
+          setExpandedPaths(new Set());
+        }
+
+        // Build file tree
+        const tree = await getFileTree(rootHandle, "", showHiddenFiles);
+        if (loadGenerationRef.current !== generation) return;
+        setFiles(tree);
+
+        // Restore tabs
+        const savedTabs = localStorage.getItem(getKey(TABS_STORAGE_KEY_BASE));
+        if (!savedTabs) {
+          setTabs([]);
+          setActivePath(null);
+          setContentImmediate("");
+          setProperties([]);
+          return;
+        }
+
+        const paths: string[] = JSON.parse(savedTabs);
+        const restoredTabs = paths
+          .map((path) =>
+            path === GRAPH_TAB_PATH
+              ? createGraphTabNode(rootHandle)
+              : findNodeByPath(tree, path),
+          )
+          .filter((node): node is FileNode => node !== null);
+        if (loadGenerationRef.current !== generation) return;
+        setTabs(restoredTabs);
+
+        // Restore active tab
+        const savedActive = localStorage.getItem(
+          getKey(ACTIVE_PATH_STORAGE_KEY_BASE),
+        );
+        const activeNode = savedActive
+          ? (restoredTabs.find((t) => t.relativePath === savedActive) ?? null)
+          : null;
+
+        if (!activeNode) {
+          setActivePath(null);
+          setContentImmediate("");
+          setProperties([]);
+          return;
+        }
+
+        if (loadGenerationRef.current !== generation) return;
+        setActivePath(activeNode.relativePath);
+
+        if (
+          activeNode.relativePath === GRAPH_TAB_PATH ||
+          isImageFile(activeNode.name)
+        ) {
+          setContentImmediate("");
+          setProperties([]);
+        } else {
+          await loadFileContent(
+            activeNode.handle as FileSystemFileHandle,
+            lastModifiedRef,
+            setProperties,
+            setContentImmediate,
+          );
+        }
+      } catch (e) {
+        console.error("Failed to restore folder state", e);
+      } finally {
+        if (loadGenerationRef.current === generation) {
+          isSwitchingFolderRef.current = false;
+        }
+      }
+    };
+
+    void loadFolderState();
+
+    return () => {
+      ++loadGenerationRef.current;
+    };
+  }, [rootHandle, setContentImmediate, showHiddenFiles]);
+
+  // Initial app setup - find a folder to open
   React.useEffect(() => {
     const init = async () => {
-      const showHiddenFilesOnInit =
-        localStorage.getItem("showHiddenFiles") === "true";
-      const savedTabs = localStorage.getItem(TABS_STORAGE_KEY);
-      const savedActive = localStorage.getItem(ACTIVE_PATH_STORAGE_KEY);
-      const recent = await getRecentFolder();
+      const recents = await getRecentFolders();
+      const recent = recents ? recents[0] : null;
 
       if (recent) {
         setRootHandle(recent);
-        const tree = await getFileTree(recent, "", showHiddenFilesOnInit);
-        setFiles(tree);
-
-        if (savedTabs) {
-          try {
-            const paths = JSON.parse(savedTabs) as string[];
-            const restoredTabs: FileNode[] = [];
-            for (const path of paths) {
-              if (path === GRAPH_TAB_PATH) {
-                restoredTabs.push(createGraphTabNode(recent));
-                continue;
-              }
-              const node = findNodeByPath(tree, path);
-              if (node) restoredTabs.push(node);
-            }
-            setTabs(restoredTabs);
-
-            if (savedActive) {
-              const activeNode = restoredTabs.find(
-                (t) => t.relativePath === savedActive,
-              );
-              if (activeNode) {
-                setActivePath(activeNode.relativePath);
-                if (activeNode.relativePath === GRAPH_TAB_PATH) {
-                  setContentImmediate("");
-                  setProperties([]);
-                } else {
-                  const { content: text, lastModified } = await readFile(
-                    activeNode.handle as FileSystemFileHandle,
-                  );
-                  lastModifiedRef.current = lastModified;
-                  const {
-                    frontmatter: fm,
-                    hasFrontmatter,
-                    body,
-                  } = parseFrontmatter(text);
-                  const props = hasFrontmatter
-                    ? frontmatterToProperties(fm)
-                    : [];
-                  setProperties(props);
-                  const processed = parseInternalLinkMarkdown(
-                    hasFrontmatter ? body : text,
-                  );
-                  setContentImmediate(processed);
-                }
-              }
-            }
-          } catch (e) {
-            console.error("Failed to restore tabs", e);
-          }
-        }
       } else {
         const stored = await getStoredHandle();
         if (stored) {
@@ -1099,7 +1252,7 @@ function App() {
       setIsInitialLoading(false);
     };
     init();
-  }, [setContentImmediate]);
+  }, []);
 
   React.useEffect(() => {
     if (!currentFile || currentFile.handle.kind !== "file") return;
@@ -1188,14 +1341,7 @@ function App() {
     );
   }
 
-  const currentIsImage = [
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".svg",
-    ".webp",
-  ].some((ext) => currentFile?.name.toLowerCase().endsWith(ext));
+  const currentIsImage = currentFile ? isImageFile(currentFile.name) : false;
   const currentIsGraph = currentFile?.relativePath === GRAPH_TAB_PATH;
 
   return (
@@ -1238,18 +1384,38 @@ function App() {
           }
           right={
             <div className="flex items-center gap-2">
-              <span className="hidden text-muted-foreground text-xs lg:inline">
-                {rootHandle.name}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleOpenFolder}
-                type="button"
-                className="h-8"
+              <Popover
+                open={isFolderSwitcherOpen}
+                onOpenChange={setIsFolderSwitcherOpen}
               >
-                Change
-              </Button>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    type="button"
+                    className="h-8 text-muted-foreground"
+                  >
+                    {rootHandle.name}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-48 p-0" align="end">
+                  <FolderSwitcher
+                    currentRoot={rootHandle}
+                    onFolderSelect={async (handle) => {
+                      try {
+                        saveCurrentFolderState();
+                        isSwitchingFolderRef.current = true;
+                        setRootHandle(handle);
+                      } catch (err) {
+                        isSwitchingFolderRef.current = false;
+                        console.error("Failed to switch folder", err);
+                      }
+                    }}
+                    onOpenFolder={handleOpenFolder}
+                    isOpen={isFolderSwitcherOpen}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           }
         />
@@ -1311,16 +1477,7 @@ function App() {
                 );
               }
 
-              const isImage = [
-                ".png",
-                ".jpg",
-                ".jpeg",
-                ".gif",
-                ".svg",
-                ".webp",
-              ].some((ext) => tab.name.toLowerCase().endsWith(ext));
-
-              if (isImage) {
+              if (isImageFile(tab.name)) {
                 if (tab.relativePath !== activePath) return null;
                 return <ImageTab key={tab.relativePath} file={tab} />;
               }

@@ -1,7 +1,7 @@
 import { get, set } from "idb-keyval";
 import { extractTags, matchQuery, type Searchable } from "./search";
 
-const RECENT_FOLDER_KEY = "recent-folder-handle";
+const RECENT_FOLDERS_KEY = "recent-folders-handle";
 
 export interface FileNode {
   name: string;
@@ -85,25 +85,35 @@ export async function writeFile(
   return file.lastModified;
 }
 
-export async function saveRecentFolder(handle: FileSystemDirectoryHandle) {
-  await set(RECENT_FOLDER_KEY, handle);
+export async function saveRecentFolders(handles: FileSystemDirectoryHandle[]) {
+  await set(RECENT_FOLDERS_KEY, handles);
 }
 
-export async function getRecentFolder(): Promise<FileSystemDirectoryHandle | null> {
-  const handle = await get<FileSystemDirectoryHandle>(RECENT_FOLDER_KEY);
-  if (!handle) return null;
+export async function getRecentFolders(): Promise<
+  FileSystemDirectoryHandle[] | null
+> {
+  const handles = await get<FileSystemDirectoryHandle[]>(RECENT_FOLDERS_KEY);
+  if (!handles) return null;
 
   // Verify permission
-  // @ts-expect-error
-  if ((await handle.queryPermission({ mode: "readwrite" })) === "granted") {
-    return handle;
+  const filteredHandles: FileSystemDirectoryHandle[] = [];
+
+  for (const handle of handles) {
+    // @ts-expect-error
+    const perm = await handle.queryPermission({ mode: "readwrite" });
+    // @ts-expect-error
+    const readPerm = await handle.queryPermission({ mode: "read" });
+    if (perm === "granted" || readPerm === "granted") {
+      filteredHandles.push(handle);
+    }
   }
 
-  return null;
+  return filteredHandles.length > 0 ? filteredHandles : null;
 }
 
 export async function getStoredHandle(): Promise<FileSystemDirectoryHandle | null> {
-  return (await get<FileSystemDirectoryHandle>(RECENT_FOLDER_KEY)) || null;
+  const handles = await get<FileSystemDirectoryHandle[]>(RECENT_FOLDERS_KEY);
+  return handles?.[0] ?? null;
 }
 
 export async function searchFiles(
@@ -186,8 +196,19 @@ export async function searchFiles(
 export async function requestPermission(
   handle: FileSystemHandle,
 ): Promise<boolean> {
-  // @ts-expect-error
-  return (await handle.requestPermission({ mode: "readwrite" })) === "granted";
+  try {
+    // @ts-expect-error
+    const readwrite = await handle.requestPermission({ mode: "readwrite" });
+    if (readwrite === "granted") return true;
+  } catch {}
+
+  try {
+    // @ts-expect-error
+    const read = await handle.requestPermission({ mode: "read" });
+    return read === "granted";
+  } catch {
+    return false;
+  }
 }
 
 export async function getFileHandleByPath(

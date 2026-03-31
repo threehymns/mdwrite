@@ -804,6 +804,13 @@ function areFileTreeNodePropsEqual(
   const prevExpanded = prev.expandedPaths?.has(prev.node.relativePath) ?? false;
   const nextExpanded = next.expandedPaths?.has(next.node.relativePath) ?? false;
 
+  // If expandedPaths Set reference changed, expanded nodes must re-render
+  // so their FileTree children receive the updated Set. Collapsed nodes
+  // have no visible children and can safely skip.
+  const expandedPathsEqual =
+    prev.expandedPaths === next.expandedPaths ||
+    (!prevExpanded && !nextExpanded);
+
   return (
     prev.node === next.node &&
     prev.level === next.level &&
@@ -819,7 +826,7 @@ function areFileTreeNodePropsEqual(
     prev.onDragEnd === next.onDragEnd &&
     prev.onDropTargetChange === next.onDropTargetChange &&
     prevSelected === nextSelected &&
-    prevExpanded === nextExpanded &&
+    expandedPathsEqual &&
     prev.onDirectoryToggle === next.onDirectoryToggle
   );
 }
