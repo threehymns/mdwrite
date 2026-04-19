@@ -96,17 +96,24 @@ export async function getRecentFolders(): Promise<
   if (!handles) return null;
 
   // Verify permission
-  const filteredHandles: FileSystemDirectoryHandle[] = [];
+  const results = await Promise.all(
+    handles.map(async (handle) => {
+      const [perm, readPerm] = await Promise.all([
+        // @ts-expect-error
+        handle.queryPermission({ mode: "readwrite" }),
+        // @ts-expect-error
+        handle.queryPermission({ mode: "read" }),
+      ]);
+      return {
+        handle,
+        granted: perm === "granted" || readPerm === "granted",
+      };
+    }),
+  );
 
-  for (const handle of handles) {
-    // @ts-expect-error
-    const perm = await handle.queryPermission({ mode: "readwrite" });
-    // @ts-expect-error
-    const readPerm = await handle.queryPermission({ mode: "read" });
-    if (perm === "granted" || readPerm === "granted") {
-      filteredHandles.push(handle);
-    }
-  }
+  const filteredHandles = results
+    .filter((r) => r.granted)
+    .map((r) => r.handle);
 
   return filteredHandles.length > 0 ? filteredHandles : null;
 }
