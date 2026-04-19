@@ -65,6 +65,9 @@ export function matchQuery(query: string, item: Searchable): boolean {
   } else if (term.startsWith("content:")) {
     const val = term.slice(8).toLowerCase().replace(/"/g, "");
     matches = (item.content || "").toLowerCase().includes(val);
+  } else if (term.startsWith("label:")) {
+    const val = term.slice(6).toLowerCase().replace(/"/g, "");
+    matches = item.label.toLowerCase().includes(val);
   } else {
     const val = term.toLowerCase().replace(/"/g, "");
     matches =
