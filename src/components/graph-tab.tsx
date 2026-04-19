@@ -50,10 +50,8 @@ interface GraphNode {
 }
 
 interface GraphLink {
-  // biome-ignore lint/suspicious/noExplicitAny: d3 force graph source/target can be node objects
-  source: string | any;
-  // biome-ignore lint/suspicious/noExplicitAny: d3 force graph source/target can be node objects
-  target: string | any;
+  source: string | GraphNode;
+  target: string | GraphNode;
 }
 
 interface PanelState {
@@ -454,8 +452,15 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
     nodeId: string | null;
   } | null>(null);
 
-  // biome-ignore lint/suspicious/noExplicitAny: force-graph-react ref typing is complex
-  const graphRef = React.useRef<any>(null);
+interface ForceGraphInstance {
+  zoom: (scale: number, duration?: number) => void;
+  panBy: (x: number, y: number, duration?: number) => void;
+  zoomToFit: (duration?: number, padding?: number) => void;
+  d3Force: (name: string, force?: any) => any;
+  d3ReheatSimulation: () => void;
+}
+
+  const graphRef = React.useRef<ForceGraphInstance | null>(null);
   const viewportRef = React.useRef<HTMLDivElement>(null);
   const prevVisibleIds = React.useRef<Set<string>>(new Set());
   const hoverStrengthsRef = React.useRef<Map<string, number>>(new Map());
@@ -826,8 +831,7 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
   }, [filtered.nodes, panel.isAnimating, rawLinks, rawNodes]);
 
   const graphData = React.useMemo(
-    // biome-ignore lint/suspicious/noExplicitAny: force-graph data typing is complex
-    () => ({ nodes: filtered.nodes, links: filtered.links }) as any,
+    () => ({ nodes: filtered.nodes, links: filtered.links }),
     [filtered.nodes, filtered.links],
   );
 
@@ -1049,15 +1053,14 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
                 panel.showArrows ? 9 * panel.linkThickness : 0
               }
               linkDirectionalArrowRelPos={1}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph link typing
-              linkDirectionalArrowColor={(link: any) => {
+              linkDirectionalArrowColor={(link: GraphLink) => {
                 const sourceId =
                   typeof link.source === "object"
-                    ? link.source.id
+                    ? (link.source as GraphNode).id
                     : link.source;
                 const targetId =
                   typeof link.target === "object"
-                    ? link.target.id
+                    ? (link.target as GraphNode).id
                     : link.target;
                 const hoverStrength = Math.max(
                   hoverStrengthsRef.current.get(sourceId) ?? 0,
@@ -1073,15 +1076,14 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
                   hoverStrength,
                 );
               }}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph link typing
-              linkWidth={(link: any) => {
+              linkWidth={(link: GraphLink) => {
                 const sourceId =
                   typeof link.source === "object"
-                    ? link.source.id
+                    ? (link.source as GraphNode).id
                     : link.source;
                 const targetId =
                   typeof link.target === "object"
-                    ? link.target.id
+                    ? (link.target as GraphNode).id
                     : link.target;
                 const base = panel.linkThickness * 0.9;
                 const hoverStrength = Math.max(
@@ -1095,15 +1097,14 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
                 );
                 return base * mix(inactiveMultiplier, 1.8, hoverStrength);
               }}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph link typing
-              linkColor={(link: any) => {
+              linkColor={(link: GraphLink) => {
                 const sourceId =
                   typeof link.source === "object"
-                    ? link.source.id
+                    ? (link.source as GraphNode).id
                     : link.source;
                 const targetId =
                   typeof link.target === "object"
-                    ? link.target.id
+                    ? (link.target as GraphNode).id
                     : link.target;
                 const hoverStrength = Math.max(
                   hoverStrengthsRef.current.get(sourceId) ?? 0,
@@ -1120,12 +1121,11 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
                 );
               }}
               nodeCanvasObject={(
-                // biome-ignore lint/suspicious/noExplicitAny: force-graph node typing
-                node: any,
+                node: GraphNode,
                 ctx: CanvasRenderingContext2D,
                 globalScale: number,
               ) => {
-                const data = node as GraphNode;
+                const data = node;
                 const isHovered = hoveredNodeId === data.id;
                 const hoverStrength =
                   hoverStrengthsRef.current.get(data.id) ?? 0;
@@ -1221,15 +1221,14 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
                   ctx.restore();
                 }
               }}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph node typing
-              onNodeHover={(node: any) => setHoveredNodeId(node?.id ?? null)}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph node typing
-              onNodeClick={(node: any) => {
-                const data = node as GraphNode;
+              onNodeHover={(node: GraphNode | null) =>
+                setHoveredNodeId(node?.id ?? null)
+              }
+              onNodeClick={(node: GraphNode) => {
+                const data = node;
                 if (data.path) onOpenFilePath(data.path);
               }}
-              // biome-ignore lint/suspicious/noExplicitAny: force-graph node typing
-              onNodeRightClick={(node: any, event: MouseEvent) => {
+              onNodeRightClick={(node: GraphNode, event: MouseEvent) => {
                 event.preventDefault();
                 setContextMenu({
                   x: event.clientX,
