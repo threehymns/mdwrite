@@ -1177,13 +1177,16 @@ function App() {
         }
 
         const paths: string[] = JSON.parse(savedTabs);
-        const restoredTabs = paths
-          .map((path) =>
+        const restoredTabs = paths.reduce<FileNode[]>((acc, path) => {
+          const node =
             path === GRAPH_TAB_PATH
               ? createGraphTabNode(rootHandle)
-              : findNodeByPath(tree, path),
-          )
-          .filter((node): node is FileNode => node !== null);
+              : findNodeByPath(tree, path);
+          if (node) {
+            acc.push(node);
+          }
+          return acc;
+        }, []);
         if (loadGenerationRef.current !== generation) return;
         setTabs(restoredTabs);
 
