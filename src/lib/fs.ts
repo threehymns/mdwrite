@@ -121,7 +121,7 @@ export async function searchFiles(
   query: string,
   relativePath = "",
 ): Promise<{ node: FileNode; snippet: string }[]> {
-  const results: { node: FileNode; snippet: string }[] = [];
+  const promises: Promise<{ node: FileNode; snippet: string }[]>[] = [];
 
   // @ts-expect-error
   for await (const entry of dirHandle.values()) {
@@ -130,67 +130,77 @@ export async function searchFiles(
       : entry.name;
 
     if (entry.kind === "directory") {
-      const subResults = await searchFiles(
-        entry as FileSystemDirectoryHandle,
-        query,
-        entryRelativePath,
+      promises.push(
+        searchFiles(
+          entry as FileSystemDirectoryHandle,
+          query,
+          entryRelativePath,
+        ),
       );
-      results.push(...subResults);
     } else if (entry.name.endsWith(".md")) {
-      const file = await (entry as FileSystemFileHandle).getFile();
-      const content = await file.text();
+      promises.push(
+        (async () => {
+          const file = await (entry as FileSystemFileHandle).getFile();
+          const content = await file.text();
 
-      const searchable: Searchable = {
-        label: entry.name,
-        path: entryRelativePath,
-        content,
-        tags: extractTags(content),
-      };
+          const searchable: Searchable = {
+            label: entry.name,
+            path: entryRelativePath,
+            content,
+            tags: extractTags(content),
+          };
 
-      if (matchQuery(query, searchable)) {
-        // Snippet logic: try to find a relevant content match
-        // We'll use a simple heuristic: find the first non-operator term that matches in content
-        const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-        let matchingTerm = "";
-        for (const term of terms) {
-          if (
-            !term.includes(":") &&
-            !term.startsWith("-") &&
-            !term.startsWith("/")
-          ) {
-            if (content.toLowerCase().includes(term.toLowerCase())) {
-              matchingTerm = term;
-              break;
+          if (matchQuery(query, searchable)) {
+            // Snippet logic: try to find a relevant content match
+            // We'll use a simple heuristic: find the first non-operator term that matches in content
+            const terms = query.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+            let matchingTerm = "";
+            for (const term of terms) {
+              if (
+                !term.includes(":") &&
+                !term.startsWith("-") &&
+                !term.startsWith("/")
+              ) {
+                if (content.toLowerCase().includes(term.toLowerCase())) {
+                  matchingTerm = term;
+                  break;
+                }
+              }
             }
+
+            const lowerContent = content.toLowerCase();
+            const lowerTerm = matchingTerm.toLowerCase() || query.toLowerCase();
+            const index = lowerContent.includes(lowerTerm)
+              ? lowerContent.indexOf(lowerTerm)
+              : 0;
+
+            const start = Math.max(0, index - 40);
+            const end = Math.min(content.length, index + lowerTerm.length + 40);
+            let snippet = content.substring(start, end);
+            if (start > 0) snippet = `...${snippet}`;
+            if (end < content.length) snippet = `${snippet}...`;
+
+            return [
+              {
+                node: {
+                  name: entry.name,
+                  kind: "file",
+                  handle: entry,
+                  relativePath: entryRelativePath,
+                  parentHandle: dirHandle,
+                },
+                snippet,
+              },
+            ];
           }
-        }
-
-        const lowerContent = content.toLowerCase();
-        const lowerTerm = matchingTerm.toLowerCase() || query.toLowerCase();
-        const index = lowerContent.includes(lowerTerm)
-          ? lowerContent.indexOf(lowerTerm)
-          : 0;
-
-        const start = Math.max(0, index - 40);
-        const end = Math.min(content.length, index + lowerTerm.length + 40);
-        let snippet = content.substring(start, end);
-        if (start > 0) snippet = `...${snippet}`;
-        if (end < content.length) snippet = `${snippet}...`;
-
-        results.push({
-          node: {
-            name: entry.name,
-            kind: "file",
-            handle: entry,
-            relativePath: entryRelativePath,
-            parentHandle: dirHandle,
-          },
-          snippet,
-        });
-      }
+          return [];
+        })(),
+      );
     }
   }
-  return results;
+
+  const results = await Promise.all(promises);
+  return results.flat();
 }
 
 export async function requestPermission(
