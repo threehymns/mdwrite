@@ -546,7 +546,7 @@ function EditorComponent({
       if (parsed) {
         onInternalLinkClick?.(parsed.target);
       } else {
-        window.open(url, "_blank");
+        window.open(url, "_blank", "noopener,noreferrer");
       }
     },
     [onInternalLinkClick],
