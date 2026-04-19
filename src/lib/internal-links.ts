@@ -1,3 +1,5 @@
+import { safeDecodeURIComponent } from "@/lib/utils";
+
 export const INTERNAL_LINK_PROTOCOL = "internal-link:";
 export const INTERNAL_LINK_EMBED_PROTOCOL = "internal-link-embed:";
 
@@ -50,14 +52,6 @@ export function parseInternalLinkHref(
   }
 
   return null;
-}
-
-function safeDecodeURIComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }
 
 export function stripInternalLinkAnchor(target: string): string {

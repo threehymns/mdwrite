@@ -23,6 +23,7 @@ import {
   stripInternalLinkAnchor,
 } from "@/lib/internal-links";
 import { extractTags, matchQuery } from "@/lib/search";
+import { safeDecodeURIComponent } from "@/lib/utils";
 
 interface GraphTabProps {
   files: FileNode[];
@@ -198,14 +199,6 @@ function resolveMarkdownLink(
   if (pathByNoExt.has(lowerNoExt)) return pathByNoExt.get(lowerNoExt) || null;
 
   return null;
-}
-
-function safeDecodeURIComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }
 
 function linearToSrgb(val: number): number {
