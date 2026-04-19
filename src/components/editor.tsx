@@ -17,6 +17,7 @@ import {
   parseInternalLinkHref,
   serializeInternalLinkMarkdown,
 } from "@/lib/internal-links";
+import { cn, isSafeUrl } from "@/lib/utils";
 import {
   EditorContextMenu,
   type EditorContextMenuState,
@@ -218,10 +219,12 @@ function EditorComponent({
           ) {
             return true;
           }
-          // Block dangerous protocols
-          if (/^(javascript|vbscript|data):/i.test(trimmed)) {
+
+          // Use our security utility to block dangerous protocols
+          if (!isSafeUrl(url)) {
             return false;
           }
+
           // Use default validation for everything else
           return !!isAllowedUri(url, ctx.protocols);
         },
@@ -545,7 +548,7 @@ function EditorComponent({
       const parsed = parseInternalLinkHref(url);
       if (parsed) {
         onInternalLinkClick?.(parsed.target);
-      } else {
+      } else if (isSafeUrl(url)) {
         window.open(url, "_blank");
       }
     },
