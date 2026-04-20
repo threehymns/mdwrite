@@ -29,10 +29,46 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { FileNode } from "@/lib/fs";
+import type { ShortcutMap } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
+
+export function Kbd({ keys }: { keys?: string[] }) {
+  if (!keys || keys.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-0.5">
+      {keys.map((key) => {
+        const isModifier = ["ctrl", "shift", "alt", "meta"].includes(
+          key.toLowerCase(),
+        );
+        let displayKey = key.toUpperCase();
+        if (key.toLowerCase() === "ctrl") displayKey = "⌘";
+        if (key.toLowerCase() === "shift") displayKey = "⇧";
+        if (key.toLowerCase() === "alt") displayKey = "⌥";
+
+        return (
+          <kbd
+            key={key}
+            className={cn(
+              "inline-flex h-5 min-w-[20px] items-center justify-center rounded border bg-muted px-1.5 font-medium font-sans text-[10px] text-muted-foreground uppercase",
+              isModifier && "text-xs",
+            )}
+          >
+            {displayKey}
+          </kbd>
+        );
+      })}
+    </div>
+  );
+}
 
 interface SidebarProps {
   files: FileNode[];
@@ -48,6 +84,7 @@ interface SidebarProps {
   onSearchOpen: () => void;
   expandedPaths?: Set<string>;
   onDirectoryToggle?: (path: string, isExpanded: boolean) => void;
+  shortcuts?: ShortcutMap;
 }
 
 function SidebarComponent({
@@ -62,6 +99,7 @@ function SidebarComponent({
   onSearchOpen,
   expandedPaths,
   onDirectoryToggle,
+  shortcuts,
 }: SidebarProps) {
   const [draggedPath, setDraggedPath] = React.useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = React.useState<string | null>(
@@ -111,10 +149,13 @@ function SidebarComponent({
           onClick={onSearchOpen}
           variant="outline"
           size="lg"
-          className="w-full justify-start"
+          className="group relative w-full justify-start overflow-hidden pr-12"
         >
           <HugeiconsIcon icon={Search01Icon} className="h-4 w-4" />
-          <span>Search</span>
+          <span className="flex-1 truncate text-left">Search</span>
+          <div className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 opacity-100 transition-colors group-hover:*:bg-secondary">
+            <Kbd keys={shortcuts?.search} />
+          </div>
         </Button>
       </div>
       <ScrollArea className="h-0 flex-1 p-2">
@@ -139,15 +180,21 @@ function SidebarComponent({
       </ScrollArea>
 
       <div className="border-t p-2">
-        <Link to="/settings">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            <HugeiconsIcon icon={Settings01Icon} className="h-4 w-4" />
-            <span>Settings</span>
-          </button>
-        </Link>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link to="/settings" className="block">
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-muted-foreground text-sm transition-colors hover:bg-secondary hover:text-foreground"
+                aria-label="Settings"
+              >
+                <HugeiconsIcon icon={Settings01Icon} className="h-4 w-4" />
+                <span>Settings</span>
+              </button>
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right">App Settings</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -422,31 +469,42 @@ function RenameInput({
         onClick={(e) => e.stopPropagation()}
         className="min-w-0 flex-1 px-1 text-sm outline-none"
       />
-      <div className="flex shrink-0 items-center">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSave(value);
-          }}
-          className="rounded-md p-0.5 text-primary hover:bg-primary/10"
-          title="Confirm"
-          aria-label="Confirm rename"
-        >
-          <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onCancel();
-          }}
-          className="rounded-md p-0.5 text-destructive hover:bg-destructive/10"
-          title="Cancel"
-          aria-label="Cancel rename"
-        >
-          <HugeiconsIcon icon={Cancel01Icon} className="h-3.5 w-3.5" />
-        </button>
+      <div className="flex shrink-0 items-center gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onSave(value);
+              }}
+              className="rounded-md p-0.5 text-primary hover:bg-primary/10"
+              aria-label="Confirm rename"
+            >
+              <HugeiconsIcon
+                icon={CheckmarkCircle02Icon}
+                className="h-3.5 w-3.5"
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Confirm Rename</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel();
+              }}
+              className="rounded-md p-0.5 text-destructive hover:bg-destructive/10"
+              aria-label="Cancel rename"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} className="h-3.5 w-3.5" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Cancel Rename</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
@@ -624,12 +682,9 @@ function FileTreeNodeComponent({
 
   const isDropTarget = dropTargetPath === node.relativePath;
 
-  // biome-ignore lint/a11y/useSemanticElements: semantic element with custom styling
-  // eslint-disable-next-line jsx-a11y/no-static-element-interactions
   const nodeContent = (
+    // biome-ignore lint/a11y/noStaticElementInteractions: layout container with drag-and-drop
     <div
-      role="button"
-      tabIndex={0}
       className={cn(
         "group flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors",
         isSelected

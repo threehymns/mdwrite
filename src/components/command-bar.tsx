@@ -3,6 +3,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import * as React from "react";
 import type { Action } from "@/lib/actions";
 import { cn } from "@/lib/utils";
+import { Kbd } from "./sidebar";
 import { CommandPalette } from "./ui/command-palette";
 
 interface CommandBarProps {
@@ -67,18 +68,7 @@ export function CommandBar({ isOpen, onClose, actions }: CommandBarProps) {
                   </span>
                 )}
               </div>
-              {action.shortcut && (
-                <div className="flex items-center gap-0.5">
-                  {action.shortcut.map((key) => (
-                    <kbd
-                      key={key}
-                      className="rounded border bg-muted px-1.5 py-0.5 font-sans text-[10px] text-muted-foreground uppercase"
-                    >
-                      {key}
-                    </kbd>
-                  ))}
-                </div>
-              )}
+              <Kbd keys={action.shortcut} />
             </button>
           ))
         ) : (

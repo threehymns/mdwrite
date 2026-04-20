@@ -19,7 +19,7 @@ import {
 import { GraphTab } from "@/components/graph-tab";
 import { ImageTab } from "@/components/image-tab";
 import { SearchDialog } from "@/components/search-dialog";
-import { Sidebar } from "@/components/sidebar";
+import { Kbd, Sidebar } from "@/components/sidebar";
 import { TabBar } from "@/components/tab-bar";
 import { useTheme } from "@/components/theme-provider";
 import { TableOfContents } from "@/components/toc";
@@ -36,6 +36,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Action } from "@/lib/actions";
 import {
   type FileNode,
@@ -1362,6 +1367,7 @@ function App() {
           onSearchOpen={handleSearchOpen}
           expandedPaths={expandedPaths}
           onDirectoryToggle={handleDirectoryToggle}
+          shortcuts={shortcuts}
         />
       )}
       <main className="flex min-w-0 flex-1 flex-col bg-background">
@@ -1375,15 +1381,24 @@ function App() {
           onTabsReorder={setTabs}
           onCopyFilePath={handleCopyFilePath}
           left={
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen((prev) => !prev)}
-              type="button"
-              className="h-8 w-8"
-            >
-              <HugeiconsIcon icon={SidebarLeft01Icon} className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsSidebarOpen((prev) => !prev)}
+                  type="button"
+                  className="h-8 w-8"
+                  aria-label="Toggle Sidebar"
+                >
+                  <HugeiconsIcon icon={SidebarLeft01Icon} className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="flex items-center gap-2">
+                <span>Toggle Sidebar</span>
+                <Kbd keys={shortcuts["toggle-sidebar"]} />
+              </TooltipContent>
+            </Tooltip>
           }
           right={
             <div className="flex items-center gap-2">
