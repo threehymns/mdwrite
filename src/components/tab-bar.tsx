@@ -177,6 +177,7 @@ export function TabBar({
                           : "opacity-0 group-hover:opacity-60 group-hover:hover:opacity-100",
                       )}
                       title="Close Tab"
+                      aria-label={`Close ${tab.name}`}
                     >
                       <HugeiconsIcon icon={Cancel01Icon} className="h-3 w-3" />
                     </button>

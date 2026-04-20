@@ -402,10 +402,16 @@ function RenameInput({
         ref={(node) => {
           if (node) {
             node.focus();
-            node.select();
+            const lastDotIndex = initialValue.lastIndexOf(".");
+            if (lastDotIndex > 0) {
+              node.setSelectionRange(0, lastDotIndex);
+            } else {
+              node.select();
+            }
           }
         }}
         type="text"
+        aria-label="New name"
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -425,6 +431,7 @@ function RenameInput({
           }}
           className="rounded-md p-0.5 text-primary hover:bg-primary/10"
           title="Confirm"
+          aria-label="Confirm rename"
         >
           <HugeiconsIcon icon={CheckmarkCircle02Icon} className="h-3.5 w-3.5" />
         </button>
@@ -436,6 +443,7 @@ function RenameInput({
           }}
           className="rounded-md p-0.5 text-destructive hover:bg-destructive/10"
           title="Cancel"
+          aria-label="Cancel rename"
         >
           <HugeiconsIcon icon={Cancel01Icon} className="h-3.5 w-3.5" />
         </button>
@@ -472,6 +480,7 @@ const Actions = React.memo(function Actions({
             "text-secondary-foreground hover:bg-secondary-foreground/20",
         )}
         onClick={handleTriggerClick}
+        aria-label="File actions"
       >
         <HugeiconsIcon icon={MoreVerticalIcon} className="h-3.5 w-3.5" />
       </DropdownMenuTrigger>
