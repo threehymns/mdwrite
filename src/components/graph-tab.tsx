@@ -452,13 +452,13 @@ export function GraphTab({ files, onOpenFilePath }: GraphTabProps) {
     nodeId: string | null;
   } | null>(null);
 
-interface ForceGraphInstance {
-  zoom: (scale: number, duration?: number) => void;
-  panBy: (x: number, y: number, duration?: number) => void;
-  zoomToFit: (duration?: number, padding?: number) => void;
-  d3Force: (name: string, force?: any) => any;
-  d3ReheatSimulation: () => void;
-}
+  interface ForceGraphInstance {
+    zoom: (scale: number, duration?: number) => void;
+    panBy: (x: number, y: number, duration?: number) => void;
+    zoomToFit: (duration?: number, padding?: number) => void;
+    d3Force: (name: string, force?: any) => any;
+    d3ReheatSimulation: () => void;
+  }
 
   const graphRef = React.useRef<ForceGraphInstance | null>(null);
   const viewportRef = React.useRef<HTMLDivElement>(null);
@@ -795,29 +795,32 @@ interface ForceGraphInstance {
     );
 
     if (newlyVisible.length > 0) {
+      const newlyVisibleSet = new Set(newlyVisible.map((n) => n.id));
+      const newlyVisibleToNeighborId = new Map<string, string>();
+
+      for (const l of rawLinks) {
+        const s = typeof l.source === "string" ? l.source : l.source.id;
+        const t = typeof l.target === "string" ? l.target : l.target.id;
+
+        if (newlyVisibleSet.has(s) && prevVisibleIds.current.has(t)) {
+          if (!newlyVisibleToNeighborId.has(s))
+            newlyVisibleToNeighborId.set(s, t);
+        }
+        if (newlyVisibleSet.has(t) && prevVisibleIds.current.has(s)) {
+          if (!newlyVisibleToNeighborId.has(t))
+            newlyVisibleToNeighborId.set(t, s);
+        }
+      }
+
+      const rawNodesMap = new Map<string, (typeof rawNodes)[0]>();
+      for (const n of rawNodes) {
+        rawNodesMap.set(n.id, n);
+      }
+
       for (const node of newlyVisible) {
-        const neighborLink = rawLinks.find((l) => {
-          const s = typeof l.source === "string" ? l.source : l.source.id;
-          const t = typeof l.target === "string" ? l.target : l.target.id;
-          return (
-            (s === node.id && prevVisibleIds.current.has(t)) ||
-            (t === node.id && prevVisibleIds.current.has(s))
-          );
-        });
-
-        if (neighborLink) {
-          const neighborId =
-            (typeof neighborLink.source === "string"
-              ? neighborLink.source
-              : neighborLink.source.id) === node.id
-              ? typeof neighborLink.target === "string"
-                ? neighborLink.target
-                : neighborLink.target.id
-              : typeof neighborLink.source === "string"
-                ? neighborLink.source
-                : neighborLink.source.id;
-
-          const neighbor = rawNodes.find((n) => n.id === neighborId);
+        const neighborId = newlyVisibleToNeighborId.get(node.id);
+        if (neighborId) {
+          const neighbor = rawNodesMap.get(neighborId);
           if (neighbor && neighbor.x !== undefined) {
             node.x = neighbor.x;
             node.y = neighbor.y;
