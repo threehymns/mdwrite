@@ -605,31 +605,31 @@ function EditorComponent({
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-background text-foreground">
-      <EditorContextMenu
-        menuState={contextMenuState}
-        onBold={handleBold}
-        onItalic={handleItalic}
-        onUnderline={handleUnderline}
-        onStrike={handleStrike}
-        onCode={handleCode}
-        onHeading={handleHeading}
-        onBulletList={handleBulletList}
-        onOrderedList={handleOrderedList}
-        onTaskList={handleTaskList}
-        onBlockquote={handleBlockquote}
-        onCodeBlock={handleCodeBlock}
-        onParagraph={handleParagraph}
-        onLinkOpen={handleLinkOpen}
-        onLinkCopy={handleLinkCopy}
-        onLinkEdit={handleLinkEdit}
-        onImageCopy={handleImageCopy}
-        onImageSaveAs={handleImageSaveAs}
-        onImageDelete={handleImageDelete}
-      >
-        <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto">
+        <EditorContextMenu
+          menuState={contextMenuState}
+          onBold={handleBold}
+          onItalic={handleItalic}
+          onUnderline={handleUnderline}
+          onStrike={handleStrike}
+          onCode={handleCode}
+          onHeading={handleHeading}
+          onBulletList={handleBulletList}
+          onOrderedList={handleOrderedList}
+          onTaskList={handleTaskList}
+          onBlockquote={handleBlockquote}
+          onCodeBlock={handleCodeBlock}
+          onParagraph={handleParagraph}
+          onLinkOpen={handleLinkOpen}
+          onLinkCopy={handleLinkCopy}
+          onLinkEdit={handleLinkEdit}
+          onImageCopy={handleImageCopy}
+          onImageSaveAs={handleImageSaveAs}
+          onImageDelete={handleImageDelete}
+        >
           <EditorContent editor={editor} />
-        </div>
-      </EditorContextMenu>
+        </EditorContextMenu>
+      </div>
       <div className="flex h-8 shrink-0 items-center justify-between border-t bg-secondary/10 px-4 text-muted-foreground text-xs">
         <div className="flex gap-4">
           <span>

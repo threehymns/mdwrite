@@ -101,8 +101,8 @@ export function EditorContextMenu({
 
   return (
     <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="flex-1 overflow-hidden">{children}</div>
+      <ContextMenuTrigger className="flex-1" asChild>
+        <div className="overflow-hidden">{children}</div>
       </ContextMenuTrigger>
       <ContextMenuContent>
         {menuState.type === "link" && menuState.linkUrl && (
