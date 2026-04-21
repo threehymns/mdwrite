@@ -169,7 +169,7 @@ export function InlineFrontmatterEditor({
               }
             >
               <Tooltip>
-                <TooltipTrigger>
+                <TooltipTrigger asChild>
                   <SelectTrigger
                     className="h-7 w-7 border-none bg-transparent p-0 [&_svg]:hidden"
                     asChild
@@ -178,6 +178,7 @@ export function InlineFrontmatterEditor({
                       className="[&_svg]:inline"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Property type: ${prop.type}`}
                     >
                       <HugeiconsIcon
                         icon={
@@ -226,7 +227,8 @@ export function InlineFrontmatterEditor({
               onChange={(e) => handleKeyChange(index, e.target.value)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               placeholder="key"
-              className="min-w-24 border-none outline-none"
+              aria-label={`Property key ${index + 1}`}
+              className="min-w-24 border-none outline-none bg-transparent"
             />
             {prop.type === "checkbox" ? (
               <Checkbox
@@ -234,6 +236,7 @@ export function InlineFrontmatterEditor({
                 onCheckedChange={(checked) =>
                   handleValueChange(index, checked === true)
                 }
+                aria-label={`Value for ${prop.key || `property ${index + 1}`}`}
               />
             ) : prop.type === "number" ? (
               <Input
@@ -243,14 +246,16 @@ export function InlineFrontmatterEditor({
                   handleValueChange(index, Number(e.target.value))
                 }
                 className="min-w-24"
+                aria-label={`Value for ${prop.key || `property ${index + 1}`}`}
               />
             ) : prop.type === "date" ? (
               <Popover>
-                <PopoverTrigger>
+                <PopoverTrigger asChild>
                   <Button
                     type="button"
                     variant="outline"
                     className="min-w-24 justify-start text-left font-normal"
+                    aria-label={`Select date for ${prop.key || `property ${index + 1}`}`}
                   >
                     {prop.value ? (
                       String(prop.value)
@@ -287,18 +292,27 @@ export function InlineFrontmatterEditor({
                 onChange={(e) => handleValueChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 placeholder="value"
-                className="min-w-32 flex-1 outline-none"
+                className="min-w-32 flex-1 outline-none bg-transparent"
+                aria-label={`Value for ${prop.key || `property ${index + 1}`}`}
               />
             )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="opacity-0 group-focus-within:opacity-100"
-              onClick={() => removeProperty(index)}
-            >
-              <HugeiconsIcon icon={Cancel01Icon} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-focus-within:opacity-100"
+                  onClick={() => removeProperty(index)}
+                  aria-label={`Remove property ${prop.key || index + 1}`}
+                >
+                  <HugeiconsIcon icon={Cancel01Icon} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Remove property</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         ))}
         <Button
