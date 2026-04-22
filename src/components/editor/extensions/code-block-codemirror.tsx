@@ -446,6 +446,7 @@ const CodeMirrorComponent = ({
           >
             <button
               type="button"
+              aria-label="Select language"
               className="flex items-center gap-1 focus:outline-none"
             >
               {React.createElement("selectedcontent")}
@@ -477,6 +478,7 @@ const CodeMirrorComponent = ({
                 isLineWrapped ? "text-primary" : "text-muted-foreground",
               )}
               title="Toggle Line Wrap"
+              aria-label="Toggle Line Wrap"
             >
               <HugeiconsIcon icon={TextWrapIcon} size={14} />
             </button>
@@ -485,6 +487,7 @@ const CodeMirrorComponent = ({
               onClick={handleCopy}
               className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               title="Copy Code"
+              aria-label="Copy Code"
             >
               {copied ? (
                 <HugeiconsIcon
