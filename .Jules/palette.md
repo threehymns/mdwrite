@@ -1,0 +1,3 @@
+## 2024-05-18 - [Add ARIA labels to icon-only buttons]
+**Learning:** Found multiple instances where icon-only buttons lacked an `aria-label` attribute (e.g. `title` attributes were present, but not `aria-label`). This causes screen readers to have a poor experience because they do not reliably read `title` attributes on interactive elements. This app uses `<Button size="icon">` and native `<button>` frequently for micro-actions, creating a recurrent a11y vulnerability.
+**Action:** When implementing new micro-actions in UI components, always ensure that `aria-label` is set explicitly on icon-only buttons regardless of the presence of `title` attributes.
