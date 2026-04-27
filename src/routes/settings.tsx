@@ -191,7 +191,7 @@ function SettingsPage() {
       <div className="mx-auto max-w-2xl space-y-8">
         <div className="flex items-center gap-4">
           <Link to="/">
-            <Button variant="ghost" size="icon" type="button">
+            <Button variant="ghost" size="icon" type="button" aria-label="Go back" title="Go back">
               <HugeiconsIcon icon={ArrowLeft01Icon} className="h-5 w-5" />
             </Button>
           </Link>

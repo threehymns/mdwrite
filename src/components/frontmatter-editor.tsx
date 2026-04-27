@@ -178,6 +178,8 @@ export function InlineFrontmatterEditor({
                       className="[&_svg]:inline"
                       variant="ghost"
                       size="icon"
+                      aria-label={`Type: ${prop.type}`}
+                      title={`Type: ${prop.type}`}
                     >
                       <HugeiconsIcon
                         icon={
@@ -296,6 +298,8 @@ export function InlineFrontmatterEditor({
               size="icon"
               className="opacity-0 group-focus-within:opacity-100"
               onClick={() => removeProperty(index)}
+              aria-label={`Remove property ${prop.key || 'new property'}`}
+              title={`Remove property ${prop.key || 'new property'}`}
             >
               <HugeiconsIcon icon={Cancel01Icon} />
             </Button>
