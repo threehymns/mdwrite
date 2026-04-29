@@ -1319,6 +1319,7 @@ interface ForceGraphInstance {
                   variant="ghost"
                   size="icon"
                   title="Reset settings"
+                  aria-label="Reset settings"
                   onClick={() => setPanel(DEFAULT_PANEL)}
                   className="size-7"
                 >
@@ -1328,6 +1329,7 @@ interface ForceGraphInstance {
                   variant="ghost"
                   size="icon"
                   title="Close panel"
+                  aria-label="Close panel"
                   onClick={() => setPaneOpen(false)}
                   className="size-7"
                 >
@@ -1431,6 +1433,7 @@ interface ForceGraphInstance {
                       <Button
                         variant="ghost"
                         size="icon"
+                        aria-label="Delete filter group"
                         onClick={() => {
                           const next = panel.groups.filter(
                             (_, i) => i !== index,
