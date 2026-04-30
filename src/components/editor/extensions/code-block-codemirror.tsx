@@ -446,6 +446,7 @@ const CodeMirrorComponent = ({
           >
             <button
               type="button"
+              aria-label="Select language"
               className="flex items-center gap-1 focus:outline-none"
             >
               {React.createElement("selectedcontent")}
@@ -471,6 +472,7 @@ const CodeMirrorComponent = ({
           <div className="flex items-center gap-1 border-border border-l pl-2">
             <button
               type="button"
+              aria-label="Toggle line wrap"
               onClick={toggleLineWrapping}
               className={cn(
                 "rounded p-1 transition-colors hover:bg-accent",
@@ -482,6 +484,7 @@ const CodeMirrorComponent = ({
             </button>
             <button
               type="button"
+              aria-label="Copy code"
               onClick={handleCopy}
               className="rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               title="Copy Code"
